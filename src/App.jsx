@@ -14,11 +14,18 @@ import {
 // ============================================================================
 // 1. FIREBASE CONFIGURATION
 // ============================================================================
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const firebaseConfig = {
+  apiKey: "AIzaSyBzarUX4dkMs487-doUfG1Ct8oivtoLX9Y",
+  authDomain: "stevens-sanctuary.firebaseapp.com",
+  projectId: "stevens-sanctuary",
+  storageBucket: "stevens-sanctuary.firebasestorage.app",
+  messagingSenderId: "45718875766",
+  appId: "1:45718875766:web:f06156090035d44366b957"
+};
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'sanctuary-os';
+const appId = "stevens-sanctuary";
 
 // ============================================================================
 // 2. HELPERS
@@ -120,9 +127,19 @@ export default function SanctuaryOS() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-        else await signInAnonymously(auth);
-      } catch (e) { console.error(e); }
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          try {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } catch (err) {
+            console.warn("Custom token failed (expected if using a custom Firebase config). Falling back to anonymous sign-in.", err);
+            await signInAnonymously(auth);
+          }
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) { 
+        console.error("Auth initialization failed:", e); 
+      }
     };
     initAuth();
     const unsub = onAuthStateChanged(auth, setUser);
