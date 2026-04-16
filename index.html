@@ -1,0 +1,1247 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { 
+  Home, Baby, Briefcase, Heart, Zap, Battery, BatteryFull, BatteryLow, 
+  BellRing, CheckCircle2, Circle, Utensils, Star, Folder, Plus, User, 
+  Calendar, ShoppingCart, MessageSquare, X, Trash2, Edit2, Check,
+  ListTodo, AlertCircle, ArrowDownUp, Settings, Tag, CreditCard, Moon, Sun, ChevronLeft, ChevronRight, UserPlus, RefreshCw
+} from 'lucide-react';
+
+// --- FIREBASE SETUP ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'sanctuary-os';
+
+// --- HELPERS ---
+const getBadgeColors = (color) => {
+    const map = {
+        slate: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        red: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+        orange: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        amber: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+        emerald: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
+        blue: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+        purple: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+        pink: 'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
+    };
+    return map[color] || map.slate;
+};
+
+// Calculate Age Helper based on Jan 31, 2025
+const getLeoAge = () => {
+    const today = new Date();
+    const birthDate = new Date('2025-01-31');
+
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+    
+    if (today.getDate() < birthDate.getDate()) {
+        months--;
+        if (months < 0) {
+            years--;
+            months += 12;
+        }
+    }
+    
+    const yearStr = years > 0 ? `${years} Year${years > 1 ? 's' : ''}` : '';
+    const monthStr = months > 0 ? `${months} Month${months > 1 ? 's' : ''}` : '';
+    
+    if (!yearStr && !monthStr) return "Newborn";
+    return `${yearStr} ${yearStr && monthStr ? 'and' : ''} ${monthStr} old`.trim();
+};
+
+const getMonday = (offset) => {
+    const d = new Date();
+    const day = d.getDay() || 7; 
+    d.setDate(d.getDate() - day + 1 + (offset * 7));
+    d.setHours(0,0,0,0);
+    return d;
+};
+
+export default function SanctuaryOS() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(localStorage.getItem('sanctuary_profile') || null);
+  const [isDarkMode, setIsDarkMode] = useState(localStorage.getItem('sanctuary_theme') === 'dark');
+
+  // App State
+  const [activeTab, setActiveTab] = useState('pulse');
+  const [energyFilter, setEnergyFilter] = useState('all'); 
+  const [sortBy, setSortBy] = useState('date'); 
+  
+  const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]);
+  const [leoData, setLeoData] = useState({ milestones: [], appointments: [], restock: [] });
+  const [shoppingList, setShoppingList] = useState([]);
+  const [meals, setMeals] = useState([]);
+
+  // UI State
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showStatusManager, setShowStatusManager] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+      if (isDarkMode) document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+      localStorage.setItem('sanctuary_theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
+
+  // 1. Authentication
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth Error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Data Fetching
+  useEffect(() => {
+    if (!user) return;
+    const basePath = ['artifacts', appId, 'public', 'data'];
+
+    const unsubscribeUsers = onSnapshot(collection(db, ...basePath, 'system_users'), (snap) => {
+        const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (fetched.length === 0) {
+            addDoc(collection(db, ...basePath, 'system_users'), { name: 'Jordan' });
+            addDoc(collection(db, ...basePath, 'system_users'), { name: 'B' });
+        } else {
+            setSystemUsers(fetched);
+        }
+    });
+
+    if (!userProfile) return unsubscribeUsers; // Only fetch rest if profile selected
+
+    const unsubscribeTasks = onSnapshot(collection(db, ...basePath, 'tasks'), (snap) => setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribeProjects = onSnapshot(collection(db, ...basePath, 'projects'), (snap) => setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribeComments = onSnapshot(collection(db, ...basePath, 'comments'), (snap) => setComments(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribeNotifications = onSnapshot(collection(db, ...basePath, 'notifications'), (snap) => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribeShopping = onSnapshot(collection(db, ...basePath, 'shopping'), (snap) => setShoppingList(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubscribeMeals = onSnapshot(collection(db, ...basePath, 'meals'), (snap) => setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    
+    const unsubscribeStatuses = onSnapshot(collection(db, ...basePath, 'statuses'), (snap) => {
+        const fetchedStatuses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (fetchedStatuses.length === 0) {
+            addDoc(collection(db, ...basePath, 'statuses'), { name: 'To Do', color: 'slate' });
+            addDoc(collection(db, ...basePath, 'statuses'), { name: 'In Progress', color: 'blue' });
+            addDoc(collection(db, ...basePath, 'statuses'), { name: 'Waiting on B', color: 'purple' });
+        } else {
+            setStatuses(fetchedStatuses);
+        }
+    });
+
+    const unsubscribeLeo = onSnapshot(collection(db, ...basePath, 'leodata'), (snap) => {
+       const data = { milestones: [], appointments: [], restock: [] };
+       snap.docs.forEach(doc => {
+           const item = { id: doc.id, ...doc.data() };
+           if(data[item.type]) data[item.type].push(item);
+       });
+       setLeoData(data);
+    });
+
+    return () => {
+      unsubscribeTasks(); unsubscribeProjects(); unsubscribeComments();
+      unsubscribeNotifications(); unsubscribeLeo(); unsubscribeStatuses();
+      unsubscribeShopping(); unsubscribeMeals(); unsubscribeUsers();
+    };
+  }, [user, userProfile]);
+
+  // --- CORE ACTIONS ---
+  const sendNotification = async (targetUser, message, taskId = null) => {
+    if (!user || !targetUser) return;
+    
+    // If assigned to "Both", find the other user(s) and send it to them
+    if (targetUser === 'Both') {
+        const otherUsers = systemUsers.filter(u => u.name !== userProfile);
+        for (const u of otherUsers) {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notifications'), {
+                targetUser: u.name, message, taskId, read: false, createdAt: new Date().toISOString()
+            });
+        }
+        return;
+    }
+
+    // Do not notify yourself
+    if (targetUser === userProfile) return;
+
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'notifications'), {
+      targetUser, message, taskId, read: false, createdAt: new Date().toISOString()
+    });
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read && user) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notification.id), { read: true });
+    }
+    
+    if (notification.taskId) {
+        const targetTask = tasks.find(t => t.id === notification.taskId);
+        if (targetTask) {
+            if (targetTask.category === 'Sanctuary') setActiveTab('sanctuary');
+            else if (targetTask.category === 'Side Business') setActiveTab('business');
+            else if (targetTask.category === 'Sacred') setActiveTab('sacred');
+            else setActiveTab('pulse');
+            
+            setSelectedTask(targetTask);
+            setShowNotifications(false);
+        }
+    }
+  };
+
+  const handleToggleTask = async (task) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id), { completed: !task.completed });
+    
+    if (!task.completed && task.assignee && task.assignee !== userProfile) {
+        sendNotification(task.assignee, `${userProfile} completed your task: "${task.title}"`, task.id);
+    }
+  };
+
+  const handleAddTask = async (title, category, assignee, energy, projectId, priority = 'Medium', statusId = null) => {
+    if (!user || !title.trim()) return;
+    
+    const todoStatus = statuses.find(s => s.name.toLowerCase() === 'to do');
+    const defaultStatus = statusId || (todoStatus ? todoStatus.id : (statuses.length > 0 ? statuses[0].id : null));
+    
+    const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+      title, category, energy, assignee, projectId, priority, statusId: defaultStatus,
+      completed: false, nudged: false, createdAt: new Date().toISOString(), createdBy: userProfile
+    });
+
+    if (assignee && assignee !== userProfile) {
+        sendNotification(assignee, `${userProfile} assigned you a task: "${title}"`, docRef.id);
+    }
+  };
+
+  const handleUpdateTask = async (taskId, updates) => {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId), updates);
+      
+      // If the assignee was changed, fire a notification to the new assignee
+      if (updates.assignee !== undefined) {
+          const targetTask = tasks.find(t => t.id === taskId);
+          if (targetTask && updates.assignee !== targetTask.assignee && updates.assignee !== userProfile && updates.assignee !== '') {
+              sendNotification(updates.assignee, `${userProfile} assigned you to: "${targetTask.title}"`, taskId);
+          }
+      }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', taskId));
+    if (selectedTask?.id === taskId) setSelectedTask(null);
+  };
+
+  const handleAddComment = async (taskId, text, taskAssignee, taskTitle) => {
+      if (!text.trim()) return;
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'comments'), {
+          taskId, text, author: userProfile, createdAt: new Date().toISOString()
+      });
+      if (taskAssignee && taskAssignee !== userProfile && taskAssignee !== 'Both') {
+          const snippet = text.length > 30 ? text.substring(0, 30) + '...' : text;
+          sendNotification(taskAssignee, `${userProfile} on "${taskTitle}": "${snippet}"`, taskId);
+      }
+  };
+
+  const handleAddUser = async (name) => {
+      if(!name.trim() || !user) return;
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'system_users'), { name: name.trim() });
+  };
+
+  const handleDeleteUser = async (id) => {
+      if(!user) return;
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'system_users', id));
+  };
+
+
+  const sortTasksList = (tasksList) => {
+      return [...tasksList].sort((a, b) => {
+          if (sortBy === 'alpha') return a.title.localeCompare(b.title);
+          if (sortBy === 'priority') {
+              const p = { 'High': 3, 'Medium': 2, 'Low': 1 };
+              return (p[b.priority] || 0) - (p[a.priority] || 0);
+          }
+          return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+  };
+
+  // --- RENDER HELPERS ---
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">Loading Sanctuary...</div>;
+  if (!user) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">Please log in.</div>;
+
+  // 3. Login Profile Selector (Clean Design)
+  if (!userProfile) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6">
+              <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-lg max-w-md w-full text-center border border-slate-100 dark:border-slate-700">
+                  <Star className="w-12 h-12 text-indigo-500 fill-indigo-500 mx-auto mb-4" />
+                  <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Welcome Home</h1>
+                  <p className="text-slate-500 dark:text-slate-400 mb-8">Who is opening the app right now?</p>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                      {systemUsers.map(u => (
+                          <button key={u.id} onClick={() => { setUserProfile(u.name); localStorage.setItem('sanctuary_profile', u.name); }} className="p-4 rounded-xl border-2 border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-bold hover:scale-[1.03] transition-transform shadow-sm">
+                              {u.name}
+                          </button>
+                      ))}
+                  </div>
+                  {systemUsers.length === 0 && <p className="text-sm text-slate-400 mt-4">Loading profiles...</p>}
+              </div>
+          </div>
+      );
+  }
+
+  const myUnreadNotifications = notifications.filter(n => n.targetUser === userProfile && !n.read);
+
+  // Ensure the modal always reads the live, updated task data from our state, not a stale snapshot
+  const activeSelectedTask = selectedTask ? tasks.find(t => t.id === selectedTask.id) : null;
+
+  return (
+    <div className={`min-h-screen text-slate-800 font-sans flex flex-col md:flex-row overflow-hidden relative ${isDarkMode ? 'dark bg-slate-900 text-slate-100' : 'bg-slate-50'}`}>
+      
+      {/* SIDEBAR */}
+      <nav className="bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 w-full md:w-64 flex-shrink-0 fixed bottom-0 md:static z-20 md:h-screen flex md:flex-col justify-around md:justify-start p-2 md:p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:shadow-none overflow-y-auto overflow-x-hidden">
+        <div className="hidden md:block mb-8 mt-4 px-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Star className="w-6 h-6 text-indigo-500 fill-indigo-500" />
+            Sanctuary OS
+          </h1>
+        </div>
+
+        <div className="flex md:flex-col w-full gap-1 md:gap-2">
+            <NavItem icon={<Zap />} label="Pulse" active={activeTab === 'pulse'} onClick={() => setActiveTab('pulse')} color="text-indigo-600" />
+            <NavItem icon={<Home />} label="Sanctuary" active={activeTab === 'sanctuary'} onClick={() => setActiveTab('sanctuary')} color="text-rose-500" />
+            <NavItem icon={<Baby />} label="Leo" active={activeTab === 'leo'} onClick={() => setActiveTab('leo')} color="text-sky-500" />
+            <NavItem icon={<ShoppingCart />} label="Groceries" active={activeTab === 'groceries'} onClick={() => setActiveTab('groceries')} color="text-teal-500" />
+            <NavItem icon={<Briefcase />} label="Business" active={activeTab === 'business'} onClick={() => setActiveTab('business')} color="text-amber-500" />
+            <NavItem icon={<CreditCard />} label="Finances" active={activeTab === 'finances'} onClick={() => setActiveTab('finances')} color="text-blue-500" />
+            <NavItem icon={<Heart />} label="Sacred" active={activeTab === 'sacred'} onClick={() => setActiveTab('sacred')} color="text-emerald-500" />
+        </div>
+        
+        <div className="hidden md:flex mt-auto pt-4 border-t border-slate-100 dark:border-slate-700 flex-col gap-4">
+           <div className="flex items-center justify-between px-2">
+               <span className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><User className="w-4 h-4"/> {userProfile}</span>
+               <button onClick={() => { setUserProfile(null); localStorage.removeItem('sanctuary_profile'); }} className="text-xs text-slate-400 hover:text-slate-800 dark:hover:text-white">Switch</button>
+           </div>
+        </div>
+      </nav>
+
+      {/* TOP BAR MOBILE */}
+      <div className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-10 md:hidden flex items-center justify-between px-4">
+          <div className="flex items-center gap-2 font-bold text-lg dark:text-white"><Star className="w-5 h-5 text-indigo-500 fill-indigo-500" /> Sanctuary</div>
+          <div className="flex items-center gap-2 relative">
+             <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors">
+                <Settings className="w-6 h-6"/>
+             </button>
+             <button onClick={() => { setShowNotifications(true); }} className="relative p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-full transition-colors">
+                <BellRing className="w-6 h-6" />
+                {myUnreadNotifications.length > 0 && (
+                    <span className="absolute top-1 right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-slate-800"></span>
+                    </span>
+                )}
+             </button>
+             {/* Bouncing Notification Tooltip (Mobile) */}
+             {myUnreadNotifications.length > 0 && !showNotifications && (
+                 <div className="absolute top-full mt-1 right-2 bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg flex items-center animate-bounce whitespace-nowrap z-50 pointer-events-none">
+                     <div className="absolute -top-1 right-3 w-2.5 h-2.5 bg-indigo-600 rotate-45"></div>
+                     {myUnreadNotifications.length} New Notification{myUnreadNotifications.length > 1 ? 's' : ''}
+                 </div>
+             )}
+          </div>
+      </div>
+      
+      {/* DESKTOP TOP RIGHT ACTIONS */}
+      <div className="hidden md:flex fixed top-4 right-8 z-20 gap-3 items-center">
+          {/* Bouncing Notification Tooltip (Desktop) */}
+          {myUnreadNotifications.length > 0 && !showNotifications && (
+              <div className="animate-bounce bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg flex items-center mr-2 relative pointer-events-none">
+                  {myUnreadNotifications.length} New Notification{myUnreadNotifications.length > 1 ? 's' : ''}
+                  <div className="absolute top-1/2 -right-1 -translate-y-1/2 w-2.5 h-2.5 bg-indigo-600 rotate-45"></div>
+              </div>
+          )}
+          <button onClick={() => setShowSettings(true)} className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+              <Settings className="w-6 h-6 text-slate-600 dark:text-slate-300" />
+          </button>
+          <button onClick={() => { setShowNotifications(true); }} className="relative p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+              <BellRing className="w-6 h-6 text-slate-600 dark:text-slate-300" />
+              {myUnreadNotifications.length > 0 && (
+                  <span className="absolute top-2 right-2 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white dark:border-slate-800"></span>
+                  </span>
+              )}
+          </button>
+      </div>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 pt-20 md:pt-8 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-screen relative bg-slate-50 dark:bg-slate-900">
+        
+        {activeTab === 'pulse' && <PulseView tasks={sortTasksList(tasks)} toggleTask={handleToggleTask} energyFilter={energyFilter} setEnergyFilter={setEnergyFilter} userProfile={userProfile} onOpenTask={setSelectedTask} statuses={statuses} sortBy={sortBy} setSortBy={setSortBy} />}
+        {activeTab === 'leo' && <LeoView leoData={leoData} user={user} appId={appId} db={db} />}
+        {activeTab === 'groceries' && <GroceriesView shoppingList={shoppingList} meals={meals} appId={appId} db={db} user={user} />}
+        {activeTab === 'finances' && <FinancesView />}
+        {activeTab === 'sanctuary' && 
+          <ProjectWorkspace 
+            category="Sanctuary" title="The Sanctuary" icon={<Home className="w-8 h-8"/>} color="rose"
+            tasks={sortTasksList(tasks.filter(t => t.category === 'Sanctuary'))} projects={projects.filter(p => p.category === 'Sanctuary')} systemUsers={systemUsers}
+            toggleTask={handleToggleTask} onAddTask={handleAddTask} onOpenTask={setSelectedTask} db={db} appId={appId} statuses={statuses} sortBy={sortBy} setSortBy={setSortBy}
+          />
+        }
+        {activeTab === 'business' && 
+          <ProjectWorkspace 
+            category="Side Business" title="Side Businesses" icon={<Briefcase className="w-8 h-8"/>} color="amber"
+            tasks={sortTasksList(tasks.filter(t => t.category === 'Side Business'))} projects={projects.filter(p => p.category === 'Side Business')} systemUsers={systemUsers}
+            toggleTask={handleToggleTask} onAddTask={handleAddTask} onOpenTask={setSelectedTask} db={db} appId={appId} statuses={statuses} sortBy={sortBy} setSortBy={setSortBy}
+          />
+        }
+        {activeTab === 'sacred' && <SacredView tasks={sortTasksList(tasks.filter(t => t.category === 'Sacred'))} toggleTask={handleToggleTask} />}
+      </main>
+
+      {/* OVERLAYS */}
+      {activeSelectedTask && (
+          <TaskDetailModal 
+            task={activeSelectedTask} onClose={() => setSelectedTask(null)} onUpdate={(updates) => handleUpdateTask(activeSelectedTask.id, updates)} onDelete={() => handleDeleteTask(activeSelectedTask.id)}
+            comments={comments.filter(c => c.taskId === activeSelectedTask.id).sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt))} systemUsers={systemUsers}
+            onAddComment={(text) => handleAddComment(activeSelectedTask.id, text, activeSelectedTask.assignee, activeSelectedTask.title)} userProfile={userProfile} onSendNotification={sendNotification}
+            statuses={statuses} onManageStatuses={() => setShowStatusManager(true)}
+          />
+      )}
+
+      {showStatusManager && (
+          <StatusManagerModal statuses={statuses} db={db} appId={appId} onClose={() => setShowStatusManager(false)} user={user} />
+      )}
+
+      {showSettings && (
+          <SettingsModal 
+            isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} 
+            systemUsers={systemUsers} onAddUser={handleAddUser} onDeleteUser={handleDeleteUser} 
+            onClose={() => setShowSettings(false)} 
+          />
+      )}
+
+      {showNotifications && (
+          <NotificationsPanel 
+            notifications={notifications.filter(n => n.targetUser === userProfile).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))} 
+            onClose={() => setShowNotifications(false)} onNotificationClick={handleNotificationClick} userProfile={userProfile} user={user}
+          />
+      )}
+    </div>
+  );
+}
+
+// --- TAB COMPONENTS ---
+
+function NavItem({ icon, label, active, onClick, color }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex flex-col md:flex-row items-center gap-1 md:gap-3 p-2 md:p-3 rounded-xl transition-all duration-200 w-full md:mb-2
+      ${active ? 'bg-slate-200 dark:bg-slate-700 shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400'}`}
+    >
+      <div className={`${active ? color : 'text-slate-400 dark:text-slate-500'}`}>
+        {React.cloneElement(icon, { className: 'w-6 h-6 md:w-5 md:h-5' })}
+      </div>
+      <span className={`text-[10px] md:text-sm font-medium ${active ? 'text-slate-900 dark:text-white' : ''}`}>{label}</span>
+    </button>
+  );
+}
+
+function SortDropdown({ sortBy, setSortBy }) {
+    return (
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 h-10">
+            <ArrowDownUp className="w-4 h-4 text-slate-400" />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="text-sm border-none bg-transparent focus:ring-0 text-slate-600 dark:text-slate-300 outline-none cursor-pointer py-1">
+                <option value="date">Sort: Date Added</option>
+                <option value="priority">Sort: Priority</option>
+                <option value="alpha">Sort: Alphabetical</option>
+            </select>
+        </div>
+    )
+}
+
+// --- MAIN VIEWS ---
+
+function PulseView({ tasks, toggleTask, energyFilter, setEnergyFilter, userProfile, onOpenTask, statuses, sortBy, setSortBy }) {
+  const myTasks = tasks.filter(t => t.assignee === userProfile || t.assignee === 'Both' || !t.assignee);
+  const nudgedTasks = myTasks.filter(t => t.nudged && !t.completed);
+  
+  const filteredTasks = myTasks.filter(t => {
+      if (t.completed || t.nudged) return false;
+      if (energyFilter === 'all') return true;
+      return t.energy === energyFilter;
+  });
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">The Pulse</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">Hey {userProfile}. What can we tackle right now?</p>
+        </div>
+        <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+      </header>
+
+      {nudgedTasks.length > 0 && (
+        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800/50 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <BellRing className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h3 className="font-semibold text-indigo-900 dark:text-indigo-300">Priority Nudges</h3>
+          </div>
+          <div className="space-y-2">
+            {nudgedTasks.map(task => <TaskRow key={task.id} task={task} onToggle={() => toggleTask(task)} onOpen={() => onOpenTask(task)} statuses={statuses} />)}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 gap-2 md:gap-4">
+        <EnergyButton active={energyFilter === 'all'} onClick={() => setEnergyFilter('all')} icon={<ListTodo className="w-5 h-5" />} label="All Tasks" color="text-indigo-600 dark:text-indigo-400" bg="bg-indigo-50 dark:bg-indigo-900/30" border="border-indigo-200 dark:border-indigo-800" />
+        <EnergyButton active={energyFilter === 'low'} onClick={() => setEnergyFilter('low')} icon={<BatteryLow className="w-5 h-5" />} label="Low (Easy)" color="text-slate-600 dark:text-slate-300" bg="bg-slate-100 dark:bg-slate-800" border="border-slate-200 dark:border-slate-700" />
+        <EnergyButton active={energyFilter === 'medium'} onClick={() => setEnergyFilter('medium')} icon={<Battery className="w-5 h-5" />} label="Med (Steady)" color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-900/30" border="border-amber-200 dark:border-amber-800" />
+        <EnergyButton active={energyFilter === 'high'} onClick={() => setEnergyFilter('high')} icon={<BatteryFull className="w-5 h-5" />} label="High (Focus)" color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-900/30" border="border-emerald-200 dark:border-emerald-800" />
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-700">
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center justify-between">
+          <span>{energyFilter === 'all' ? 'All Active Items' : `Items for ${energyFilter} energy`}</span>
+          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">{filteredTasks.length}</span>
+        </h3>
+        {filteredTasks.length === 0 ? (
+          <div className="text-center py-8">
+             <CheckCircle2 className="w-12 h-12 text-slate-200 dark:text-slate-600 mx-auto mb-2" />
+             <p className="text-slate-500 dark:text-slate-400">Clear! Enjoy the peace.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredTasks.map(task => <TaskRow key={task.id} task={task} onToggle={() => toggleTask(task)} onOpen={() => onOpenTask(task)} statuses={statuses} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EnergyButton({ active, onClick, icon, label, color, bg, border }) {
+  return (
+    <button onClick={onClick} className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${active ? `${bg} ${border} ${color} scale-[1.02] shadow-sm` : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
+      {icon}
+      <span className="text-xs md:text-sm font-medium text-center">{label}</span>
+    </button>
+  );
+}
+
+function LeoView({ leoData, user, db, appId }) {
+  const [newItem, setNewItem] = useState('');
+  const [activeList, setActiveList] = useState('restock');
+
+  const handleAdd = async (e) => {
+      e.preventDefault();
+      if(!user || !newItem.trim()) return;
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'leodata'), {
+          type: activeList, title: newItem, completed: false, createdAt: new Date().toISOString()
+      });
+      setNewItem('');
+  };
+
+  const handleToggle = async (id, currentStatus) => {
+     if (!user) return;
+     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leodata', id), { completed: !currentStatus });
+  };
+
+  const handleDelete = async (id) => {
+      if (!user) return;
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leodata', id));
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header>
+        <h2 className="text-3xl font-bold text-sky-600 dark:text-sky-400 flex items-center gap-2">
+          <Baby className="w-8 h-8" /> Leo's World
+        </h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">{getLeoAge()} • Milestones, Needs, Appointments</p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <button onClick={() => setActiveList('restock')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${activeList === 'restock' ? 'bg-sky-50 dark:bg-sky-900/30 border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-400 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
+              <ShoppingCart className="w-6 h-6" /> <span className="font-medium">Needs Restock</span>
+          </button>
+          <button onClick={() => setActiveList('appointments')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${activeList === 'appointments' ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
+              <Calendar className="w-6 h-6" /> <span className="font-medium">Appointments</span>
+          </button>
+          <button onClick={() => setActiveList('milestone')} className={`p-4 rounded-xl border flex flex-col items-center gap-2 ${activeList === 'milestone' ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 shadow-sm' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'}`}>
+              <Star className="w-6 h-6" /> <span className="font-medium">Milestones</span>
+          </button>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 capitalize">{activeList} List</h3>
+          
+          <form onSubmit={handleAdd} className="flex gap-2 mb-4">
+              <input type="text" value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder={`Add to ${activeList}...`} className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white" />
+              <button type="submit" className="bg-sky-500 text-white p-2 rounded-lg hover:bg-sky-600"><Plus className="w-5 h-5" /></button>
+          </form>
+
+          <div className="space-y-2">
+              {leoData[activeList]?.map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 group">
+                     <button onClick={() => handleToggle(item.id, item.completed)} className="focus:outline-none">
+                        {item.completed ? <CheckCircle2 className="w-5 h-5 text-sky-500" /> : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 hover:text-sky-400" />}
+                     </button>
+                     <span className={`flex-1 text-sm ${item.completed ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>{item.title}</span>
+                     <button onClick={() => handleDelete(item.id)} className="text-slate-300 dark:text-slate-600 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4"/></button>
+                  </div>
+              ))}
+              {(!leoData[activeList] || leoData[activeList].length === 0) && <p className="text-sm text-slate-400 italic py-2">Nothing tracked here yet.</p>}
+          </div>
+      </div>
+    </div>
+  );
+}
+
+function GroceriesView({ shoppingList, meals, db, appId, user }) {
+    const [newItem, setNewItem] = useState('');
+    const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = last week, etc.
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    const handleAddShopping = async (e) => {
+        e.preventDefault();
+        if(!user || !newItem.trim()) return;
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shopping'), {
+            title: newItem, completed: false, createdAt: new Date().toISOString()
+        });
+        setNewItem('');
+    };
+
+    const toggleShopping = async (id, status) => {
+        if(!user) return;
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shopping', id), { completed: !status });
+    };
+    const deleteShopping = async (id) => {
+        if(!user) return;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shopping', id));
+    };
+
+    // Calendar Math
+    const currentWeekMonday = getMonday(weekOffset);
+    const weekId = currentWeekMonday.toISOString().split('T')[0];
+    
+    let endOfWeek = new Date(currentWeekMonday);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+    const weekDisplay = `${currentWeekMonday.toLocaleDateString([], {month:'short', day:'numeric'})} - ${endOfWeek.toLocaleDateString([], {month:'short', day:'numeric'})}`;
+
+    const handleUpdateMeal = async (day, text) => {
+        if(!user) return;
+        // Find if this meal already exists for this specific weekId
+        const existing = meals.find(m => m.day === day && m.weekId === weekId);
+        if (existing) {
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'meals', existing.id), { text });
+        } else {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'meals'), { day, text, weekId });
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <header>
+                <h2 className="text-3xl font-bold text-teal-600 dark:text-teal-400 flex items-center gap-2"><ShoppingCart className="w-8 h-8" /> Groceries & Meals</h2>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">Keep the household fueled.</p>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Meal Prep */}
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2"><Utensils className="w-5 h-5 text-teal-500"/> Meal Plan</h3>
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-700">
+                            <button onClick={()=>setWeekOffset(prev => prev - 1)} className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"><ChevronLeft className="w-4 h-4"/></button>
+                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 min-w-[85px] text-center uppercase tracking-wider">{weekOffset === 0 ? 'This Week' : weekDisplay}</span>
+                            <button onClick={()=>setWeekOffset(prev => prev + 1)} className="p-1 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"><ChevronRight className="w-4 h-4"/></button>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {days.map(day => {
+                            const meal = meals.find(m => m.day === day && m.weekId === weekId);
+                            return (
+                                <div key={day} className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">{day}</span>
+                                    <input 
+                                        type="text" 
+                                        defaultValue={meal?.text || ''} 
+                                        onBlur={(e) => handleUpdateMeal(day, e.target.value)}
+                                        placeholder="What's for dinner?" 
+                                        className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 dark:text-white" 
+                                    />
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Shopping List */}
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2"><ShoppingCart className="w-5 h-5 text-teal-500"/> Shopping List</h3>
+                    <form onSubmit={handleAddShopping} className="flex gap-2 mb-4">
+                        <input type="text" value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Add item..." className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 dark:text-white" />
+                        <button type="submit" className="bg-teal-500 text-white p-2 rounded-lg hover:bg-teal-600"><Plus className="w-5 h-5" /></button>
+                    </form>
+                    <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
+                        {shoppingList.filter(i=>!i.completed).map(item => (
+                            <div key={item.id} className="flex items-center gap-3 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 group">
+                                <button onClick={() => toggleShopping(item.id, item.completed)}><Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 hover:text-teal-400" /></button>
+                                <span className="flex-1 text-sm text-slate-700 dark:text-slate-200">{item.title}</span>
+                                <button onClick={() => deleteShopping(item.id)} className="md:opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                            </div>
+                        ))}
+                        {shoppingList.filter(i=>i.completed).map(item => (
+                            <div key={item.id} className="flex items-center gap-3 p-2 rounded opacity-50 group">
+                                <button onClick={() => toggleShopping(item.id, item.completed)}><CheckCircle2 className="w-5 h-5 text-teal-500" /></button>
+                                <span className="flex-1 text-sm text-slate-500 dark:text-slate-400 line-through">{item.title}</span>
+                                <button onClick={() => deleteShopping(item.id)} className="md:opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FinancesView() {
+    return (
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <header>
+                <h2 className="text-3xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-2"><CreditCard className="w-8 h-8" /> Finances</h2>
+                <p className="text-slate-500 dark:text-slate-400 mt-1">Household budgeting and bill tracking.</p>
+            </header>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-3xl p-12 text-center shadow-sm">
+                <CreditCard className="w-16 h-16 text-blue-300 dark:text-blue-700 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-blue-900 dark:text-blue-300 mb-2">Coming Soon</h3>
+                <p className="text-blue-700 dark:text-blue-400 max-w-md mx-auto">This space will be built out to track recurring bills, joint budgets, and financial goals for the family.</p>
+            </div>
+        </div>
+    )
+}
+
+function ProjectWorkspace({ category, title, icon, color, tasks, projects, systemUsers, toggleTask, onAddTask, onOpenTask, db, appId, statuses, sortBy, setSortBy }) {
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskAssignee, setNewTaskAssignee] = useState('');
+  const [newTaskProject, setNewTaskProject] = useState('');
+  
+  // Custom Modals State
+  const [actionProject, setActionProject] = useState(null); // { type: 'rename'|'delete', project: null }
+
+  const handleCreateTask = (e) => {
+      e.preventDefault();
+      onAddTask(newTaskTitle, category, newTaskAssignee, 'medium', newTaskProject);
+      setNewTaskTitle('');
+  };
+
+  const executeRename = async (newName) => {
+      if(newName && newName.trim() !== actionProject.project.name) {
+           await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', actionProject.project.id), { name: newName.trim() });
+      }
+      setActionProject(null);
+  };
+
+  const executeDelete = async () => {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', actionProject.project.id));
+      const projectTasks = tasks.filter(t => t.projectId === actionProject.project.id);
+      for(const t of projectTasks) {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id), { projectId: '' });
+      }
+      setActionProject(null);
+  };
+
+  const tasksByProject = projects.reduce((acc, proj) => {
+      acc[proj.id] = tasks.filter(t => t.projectId === proj.id);
+      return acc;
+  }, {});
+  const generalTasks = tasks.filter(t => !t.projectId);
+
+  const colorClass = `text-${color}-600 dark:text-${color}-400`;
+  const bgBtn = `bg-${color}-600 hover:bg-${color}-700 dark:bg-${color}-500 dark:hover:bg-${color}-600`;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h2 className={`text-3xl font-bold ${colorClass} flex items-center gap-2`}>{icon} {title}</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">Manage areas and active tasks.</p>
+          </div>
+          <div className="flex items-center gap-3">
+              <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+              <button onClick={() => setActionProject({ type: 'create' })} className={`text-sm font-medium ${colorClass} bg-${color}-50 dark:bg-${color}-900/30 px-3 py-1.5 rounded-lg flex items-center justify-center gap-1 hover:bg-${color}-100 dark:hover:bg-${color}-900/50 h-10 shrink-0`}>
+                  <Plus className="w-4 h-4"/> New Project
+              </button>
+          </div>
+      </header>
+
+      {/* Task Entry Form */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-3 text-sm uppercase tracking-wide">Add New Task</h3>
+        <form onSubmit={handleCreateTask} className="flex flex-col md:flex-row gap-3">
+          <input type="text" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="What needs to be done?" className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:text-white" />
+          <div className="flex gap-2">
+              <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)} className="border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-2 bg-slate-50 dark:bg-slate-900 text-sm focus:outline-none dark:text-slate-200">
+                <option value="">Unassigned</option>
+                {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
+                <option value="Both">Joint</option>
+              </select>
+              <select value={newTaskProject} onChange={(e) => setNewTaskProject(e.target.value)} className="border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-2 bg-slate-50 dark:bg-slate-900 text-sm focus:outline-none max-w-[120px] md:max-w-none dark:text-slate-200">
+                <option value="">General</option>
+                {projects.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+              </select>
+              <button type="submit" className={`${bgBtn} text-white px-4 py-2 rounded-lg font-medium transition-colors`}><Plus className="w-5 h-5"/></button>
+          </div>
+        </form>
+      </div>
+
+      {/* Projects Display */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {projects.map(project => (
+              <ProjectCard key={project.id} title={project.name} tasks={tasksByProject[project.id] || []} onToggle={toggleTask} onOpen={onOpenTask} accentColor={color} statuses={statuses}
+                onEdit={(e) => { e.stopPropagation(); setActionProject({ type: 'rename', project }); }} 
+                onDelete={(e) => { e.stopPropagation(); setActionProject({ type: 'delete', project }); }} />
+          ))}
+          {generalTasks.length > 0 && (
+             <ProjectCard title="General" tasks={generalTasks} onToggle={toggleTask} onOpen={onOpenTask} accentColor="slate" statuses={statuses} />
+          )}
+      </div>
+
+      {/* Modals for Project CRUD */}
+      {actionProject?.type === 'create' && (
+          <PromptModal title="New Project" placeholder="Project Name" submitText="Create" onSave={async (name) => {
+              if(name.trim()) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), { name, category, createdAt: new Date().toISOString() });
+              setActionProject(null);
+          }} onCancel={() => setActionProject(null)} />
+      )}
+      {actionProject?.type === 'rename' && (
+          <PromptModal title="Rename Project" initialValue={actionProject.project.name} submitText="Save" onSave={executeRename} onCancel={() => setActionProject(null)} />
+      )}
+      {actionProject?.type === 'delete' && (
+          <ConfirmModal title="Delete Project?" message={`Are you sure you want to delete "${actionProject.project.name}"? Tasks inside will be moved to General.`} onConfirm={executeDelete} onCancel={() => setActionProject(null)} />
+      )}
+    </div>
+  );
+}
+
+function SacredView({ tasks, toggleTask }) {
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header>
+        <h2 className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><Heart className="w-8 h-8" /> The Sacred</h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">Protecting your spiritual path and community connections.</p>
+      </header>
+      <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-center gap-6">
+        <div className="w-24 h-24 rounded-full border-4 border-emerald-200 dark:border-emerald-800 flex items-center justify-center bg-white dark:bg-slate-800 relative">
+          <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">4/7</span>
+        </div>
+        <div>
+          <h3 className="font-bold text-emerald-900 dark:text-emerald-300 text-lg">Weekly Spiritual Habit</h3>
+          <p className="text-emerald-700 dark:text-emerald-500 text-sm mb-3">You've hit 4 days of mindfulness this week. Keep the streak!</p>
+          <button className="bg-emerald-600 dark:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">Log Session</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- SHARED UI COMPONENTS ---
+
+function ProjectCard({ title, tasks, onToggle, onOpen, accentColor, onEdit, onDelete, statuses }) {
+    const activeTasks = tasks.filter(t => !t.completed);
+    const completedTasks = tasks.filter(t => t.completed);
+
+    return (
+        <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 shadow-sm flex flex-col`}>
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-700 group">
+                <div className="flex items-center gap-2">
+                    <Folder className={`w-5 h-5 text-${accentColor}-500 dark:text-${accentColor}-400`} />
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-200 truncate">{title}</h3>
+                </div>
+                {(onEdit || onDelete) && (
+                    <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={onEdit} className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white bg-slate-50 dark:bg-slate-700 rounded"><Edit2 className="w-3.5 h-3.5"/></button>
+                        <button onClick={onDelete} className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 dark:bg-slate-700 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
+                    </div>
+                )}
+            </div>
+            <div className="space-y-1.5 flex-1">
+                {activeTasks.length === 0 && completedTasks.length === 0 && <p className="text-sm text-slate-400 italic">No tasks assigned.</p>}
+                {activeTasks.map(task => <TaskRow key={task.id} task={task} onToggle={() => onToggle(task)} onOpen={() => onOpen(task)} compact statuses={statuses} />)}
+                {completedTasks.length > 0 && (
+                    <div className="mt-4 pt-2 border-t border-slate-50 dark:border-slate-700/50 opacity-60">
+                        {completedTasks.map(task => <TaskRow key={task.id} task={task} onToggle={() => onToggle(task)} onOpen={() => onOpen(task)} compact statuses={statuses} />)}
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function TaskRow({ task, onToggle, onOpen, compact = false, statuses = [] }) {
+  const currentStatus = statuses.find(s => s.id === task.statusId);
+  const badgeColorClass = currentStatus ? getBadgeColors(currentStatus.color) : getBadgeColors('slate');
+
+  return (
+    <div className={`flex items-center gap-2 p-2 rounded-xl border transition-all select-none group
+      ${task.completed ? 'bg-slate-50 dark:bg-slate-800/50 border-transparent opacity-60' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-sm'}`}>
+      
+      <button onClick={(e) => { e.stopPropagation(); onToggle(); }} className="flex-shrink-0 focus:outline-none pt-0.5">
+        {task.completed ? <CheckCircle2 className={`w-5 h-5 text-slate-400 dark:text-slate-500`} /> : <Circle className={`w-5 h-5 text-slate-300 dark:text-slate-600 hover:text-indigo-400 dark:hover:text-indigo-400`} />}
+      </button>
+      
+      <div onClick={onOpen} className="flex-1 flex flex-col cursor-pointer overflow-hidden justify-center min-w-0">
+        <div className="flex items-center gap-2">
+          {task.priority === 'High' && !task.completed && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+          {task.priority === 'Low' && !task.completed && <ArrowDownUp className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+          <span className={`truncate text-sm ${compact ? '' : 'md:text-base'} transition-all ${task.completed ? 'line-through text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-200 font-medium'}`}>
+            {task.title}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+          {!task.completed && currentStatus && (
+              <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${badgeColorClass} hidden sm:inline-block`}>
+                  {currentStatus.name}
+              </span>
+          )}
+          {!task.completed && task.assignee && (
+              <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300`}>
+                  {task.assignee}
+              </span>
+          )}
+          <button onClick={onOpen} className="p-1 text-slate-300 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+              <MessageSquare className="w-4 h-4" />
+          </button>
+      </div>
+    </div>
+  );
+}
+
+// --- MODALS & OVERLAYS ---
+
+function SettingsModal({ onClose, isDarkMode, setIsDarkMode, systemUsers, onAddUser, onDeleteUser }) {
+    const [newUserName, setNewUserName] = useState('');
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-slate-900 dark:text-white"><Settings className="w-5 h-5 text-slate-400"/> Settings</h3>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+                </div>
+                <div className="p-6 space-y-8">
+                    
+                    {/* Appearance */}
+                    <div>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Appearance</h4>
+                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="flex items-center justify-between w-full p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-200 font-medium">
+                            <span className="flex items-center gap-3">{isDarkMode ? <Moon className="w-5 h-5 text-indigo-400"/> : <Sun className="w-5 h-5 text-amber-500"/>} Dark Mode</span>
+                            <div className={`w-11 h-6 rounded-full p-1 transition-colors ${isDarkMode ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isDarkMode ? 'translate-x-5' : 'translate-x-0'}`}/>
+                            </div>
+                        </button>
+                    </div>
+
+                    {/* Household Members */}
+                    <div>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Household Profiles</h4>
+                        <div className="space-y-2 mb-4 max-h-40 overflow-y-auto pr-2">
+                            {systemUsers.map(u => (
+                                <div key={u.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">{u.name.charAt(0).toUpperCase()}</div>
+                                        <span className="font-medium text-slate-700 dark:text-slate-200">{u.name}</span>
+                                    </div>
+                                    <button onClick={() => onDeleteUser(u.id)} className="p-2 text-slate-400 hover:text-red-500 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={(e) => { e.preventDefault(); onAddUser(newUserName); setNewUserName(''); }} className="flex gap-2">
+                            <input type="text" value={newUserName} onChange={e=>setNewUserName(e.target.value)} placeholder="Add new profile name..." className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <button type="submit" disabled={!newUserName.trim()} className="bg-indigo-600 text-white p-3 rounded-xl disabled:opacity-50 hover:bg-indigo-700 transition-colors"><UserPlus className="w-5 h-5"/></button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function PromptModal({ title, initialValue = '', placeholder, submitText, onSave, onCancel }) {
+    const [val, setVal] = useState(initialValue);
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-700">
+                <h3 className="font-bold text-lg mb-4 text-slate-900 dark:text-white">{title}</h3>
+                <input autoFocus type="text" value={val} onChange={e=>setVal(e.target.value)} placeholder={placeholder} className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg px-4 py-2 mb-6 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <div className="flex justify-end gap-2">
+                    <button onClick={onCancel} className="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium">Cancel</button>
+                    <button onClick={() => onSave(val)} className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700">{submitText}</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function ConfirmModal({ title, message, onConfirm, onCancel }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-700">
+                <h3 className="font-bold text-lg text-red-600 dark:text-red-400 mb-2">{title}</h3>
+                <p className="text-slate-600 dark:text-slate-300 mb-6 text-sm">{message}</p>
+                <div className="flex justify-end gap-2">
+                    <button onClick={onCancel} className="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium">Cancel</button>
+                    <button onClick={onConfirm} className="px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function StatusManagerModal({ statuses, db, appId, onClose, user }) {
+    const [name, setName] = useState('');
+    const [color, setColor] = useState('slate');
+    const availableColors = ['slate', 'blue', 'indigo', 'purple', 'pink', 'rose', 'red', 'orange', 'amber', 'emerald', 'teal', 'cyan'];
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        if(!user || !name.trim()) return;
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'statuses'), { name, color });
+        setName('');
+    };
+
+    const handleDelete = async (id) => {
+        if(!user) return;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'statuses', id));
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh] border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-700">
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-slate-900 dark:text-white"><Tag className="w-5 h-5 text-slate-400"/> Manage Status Labels</h3>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X className="w-5 h-5"/></button>
+                </div>
+                
+                <div className="p-5 overflow-y-auto space-y-2 flex-1">
+                    {statuses.map(s => (
+                        <div key={s.id} className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                            <span className={`text-xs font-bold px-2 py-1 rounded border ${getBadgeColors(s.color)}`}>{s.name}</span>
+                            <button onClick={() => handleDelete(s.id)} className="text-slate-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4"/></button>
+                        </div>
+                    ))}
+                </div>
+
+                <form onSubmit={handleAdd} className="p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-3xl">
+                    <div className="flex gap-2 mb-3">
+                        <input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="New status name..." className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500" />
+                        <select value={color} onChange={e=>setColor(e.target.value)} className="border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none">
+                            {availableColors.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <button type="submit" className="w-full bg-slate-800 dark:bg-slate-700 text-white rounded-lg py-2 text-sm font-medium hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors">Add Status</button>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+function TaskDetailModal({ task, onClose, onUpdate, onDelete, comments, onAddComment, userProfile, statuses, onManageStatuses, systemUsers, onSendNotification }) {
+    const [editTitle, setEditTitle] = useState(task.title);
+    const [newComment, setNewComment] = useState('');
+    const [isNudging, setIsNudging] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showSaved, setShowSaved] = useState(false);
+
+    // Keep local title state in sync if it changes externally
+    useEffect(() => {
+        setEditTitle(task.title);
+    }, [task.title]);
+
+    const handleFieldUpdate = async (updates) => {
+        setIsSaving(true);
+        setShowSaved(false);
+        await onUpdate(updates);
+        setIsSaving(false);
+        setShowSaved(true);
+        setTimeout(() => setShowSaved(false), 2000);
+    };
+
+    const handleSaveTitle = () => {
+        if(editTitle.trim() !== task.title) handleFieldUpdate({ title: editTitle });
+    };
+
+    const handleToggleNudge = () => {
+        setIsNudging(true);
+        const newNudgeState = !task.nudged;
+        setTimeout(() => {
+            handleFieldUpdate({ nudged: newNudgeState });
+            if(newNudgeState && task.assignee && task.assignee !== userProfile && task.assignee !== 'Both') {
+                onSendNotification(task.assignee, `NUDGE: ${userProfile} is requesting an update on "${task.title}"`, task.id);
+            }
+            setIsNudging(false);
+        }, 600); // Small delay to show sending animation
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 dark:border-slate-700">
+                
+                <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{task.category} Task</span>
+                        <div className="flex items-center w-20">
+                            {isSaving && <span className="text-xs font-medium text-slate-400 flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin"/> Saving...</span>}
+                            {showSaved && !isSaving && <span className="text-xs font-medium text-emerald-500 flex items-center gap-1"><Check className="w-3 h-3"/> Saved</span>}
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={onDelete} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"><Trash2 className="w-4 h-4"/></button>
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+                    </div>
+                </div>
+
+                <div className="p-6 overflow-y-auto flex-1">
+                    <div className="mb-6">
+                        <input 
+                            value={editTitle} onChange={(e)=>setEditTitle(e.target.value)} onBlur={handleSaveTitle}
+                            className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white w-full border-none focus:ring-0 p-0 mb-4 bg-transparent outline-none"
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-3 text-sm text-slate-600 dark:text-slate-300 mb-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="font-medium text-slate-400 text-xs uppercase">Assignee</span>
+                                <select value={task.assignee || ''} onChange={(e) => handleFieldUpdate({assignee: e.target.value})} className="bg-slate-100 dark:bg-slate-900 rounded-lg px-2 py-2 border-none focus:ring-0 font-medium outline-none">
+                                    <option value="">Unassigned</option>
+                                    {systemUsers.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                                    <option value="Both">Both</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="font-medium text-slate-400 text-xs uppercase">Priority</span>
+                                <select value={task.priority || 'Medium'} onChange={(e) => handleFieldUpdate({priority: e.target.value})} className="bg-slate-100 dark:bg-slate-900 rounded-lg px-2 py-2 border-none focus:ring-0 font-medium outline-none">
+                                    <option value="High">High Priority</option><option value="Medium">Medium Priority</option><option value="Low">Low Priority</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <span className="font-medium text-slate-400 text-xs uppercase">Energy Req.</span>
+                                <select value={task.energy || 'medium'} onChange={(e) => handleFieldUpdate({energy: e.target.value})} className="bg-slate-100 dark:bg-slate-900 rounded-lg px-2 py-2 border-none focus:ring-0 font-medium outline-none">
+                                    <option value="low">Low Energy</option><option value="medium">Medium Energy</option><option value="high">High Energy</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1 relative">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium text-slate-400 text-xs uppercase">Status</span>
+                                    <button onClick={onManageStatuses} className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:underline flex items-center gap-1"><Settings className="w-3 h-3"/> Edit Labels</button>
+                                </div>
+                                <select value={task.statusId || ''} onChange={(e) => handleFieldUpdate({statusId: e.target.value})} className="bg-slate-100 dark:bg-slate-900 rounded-lg px-2 py-2 border-none focus:ring-0 font-medium outline-none">
+                                    <option value="">No Status</option>
+                                    {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Nudge Action Button */}
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                                <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300">Gentle Nudge</h4>
+                                <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                                    {task.nudged ? 'This task is prioritized. Click to remove.' : `Pushes this task to the top of ${task.assignee || 'their'} Pulse view.`}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={handleToggleNudge}
+                                disabled={isNudging}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all duration-300 ${
+                                    task.nudged 
+                                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600' 
+                                        : isNudging 
+                                            ? 'bg-indigo-400 text-white scale-95 opacity-80' 
+                                            : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:scale-105 active:scale-95'
+                                }`}
+                            >
+                                {isNudging ? 'Updating...' : task.nudged ? 'Remove Nudge' : 'Send Nudge'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 dark:border-slate-700 pt-6">
+                        <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4"/> Discussion</h4>
+                        <div className="space-y-4 mb-4 min-h-[100px]">
+                            {comments.length === 0 && <p className="text-sm text-slate-400 italic text-center py-4">No comments yet. Start the conversation!</p>}
+                            {comments.map(c => (
+                                <div key={c.id} className={`flex flex-col ${c.author === userProfile ? 'items-end' : 'items-start'}`}>
+                                    <span className="text-[10px] text-slate-400 mb-1 px-1">{c.author}</span>
+                                    <div className={`px-4 py-2 rounded-2xl max-w-[85%] text-sm ${c.author === userProfile ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-sm'}`}>
+                                        {c.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <form onSubmit={(e) => { e.preventDefault(); onAddComment(newComment); setNewComment(''); }} className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex gap-2">
+                    <input type="text" value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder="Type a comment..." className="flex-1 bg-white dark:bg-slate-800 rounded-full border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:text-white" />
+                    <button type="submit" disabled={!newComment.trim()} className="bg-indigo-600 text-white p-2 rounded-full disabled:opacity-50 hover:bg-indigo-700 transition-colors"><Check className="w-5 h-5"/></button>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+function NotificationsPanel({ notifications, onClose, onNotificationClick }) {
+    return (
+        <div className="fixed inset-y-0 right-0 w-full md:w-80 bg-white dark:bg-slate-800 shadow-2xl z-50 border-l border-slate-200 dark:border-slate-700 animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><BellRing className="w-5 h-5"/> Notifications</h3>
+                <div className="flex items-center gap-2">
+                    <button onClick={onClose} className="p-1 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-500"><X className="w-4 h-4"/></button>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {notifications.length === 0 ? (
+                    <p className="text-center text-slate-400 text-sm py-8">No notifications.</p>
+                ) : (
+                    notifications.map(n => (
+                        <div key={n.id} onClick={() => onNotificationClick(n)} className={`p-3 rounded-xl border text-sm cursor-pointer transition-colors ${n.read ? 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400' : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800 text-indigo-900 dark:text-indigo-300 shadow-sm hover:scale-[1.02]'}`}>
+                            {n.message}
+                            <div className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    )
+}
