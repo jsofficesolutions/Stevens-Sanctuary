@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 
 // Import your newly refactored components
-import { NavItem, Sidebar, Header } from './components/NavigationLayouts';
+import Sidebar from './components/NavigationLayouts'; // Imports NavigationLayoutSidebar as default
+import { NavigationAnchor } from './components/NavigationLayouts';
 import { MetricCard, ProgressBar } from './components/MetricCards';
 import { CategoryBadge, PriorityBadge } from './components/CategoryFilters';
 import { FormField, Input, Select, Textarea } from './components/FormInputs';
