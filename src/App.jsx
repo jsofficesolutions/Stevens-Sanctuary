@@ -240,16 +240,14 @@ export default function SanctuaryOS() {
     <div className={`min-h-screen flex transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
       
       {/* Sidebar Modular Layout Navigation */}
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLogout={handleLogout}
-        activeProfile={systemUsers[activeProfile]}
-        isDarkMode={isDarkMode}
-      />
-
+     <Sidebar 
+  activeTab={activeTab} 
+  onTabChange={setActiveTab} 
+  systemUsers={Object.values(systemUsers)} // Formats your user object map into an expected iterable array
+  activeProfile={activeProfile} 
+  onSwitchProfile={setActiveProfile} 
+  notifications={notifications}
+/>
       {/* Main Panel Content Window Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
         
