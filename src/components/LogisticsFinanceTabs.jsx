@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { cardBaseClasses, inputBaseClasses } from '../helpers';
 import { 
   DollarSign, Calendar, CheckSquare, Square, 
-  TrendingUp, Percent, Plus, Trash2 
+  TrendingUp, Percent, Plus, Trash2, Wallet 
 } from 'lucide-react';
 
 export default function LogisticsFinanceTabs({
@@ -18,6 +18,8 @@ export default function LogisticsFinanceTabs({
   const [newSupplyName, setNewSupplyName] = useState('');
   const [newBillName, setNewBillName] = useState('');
   const [newBillAmount, setNewBillAmount] = useState('');
+  const [newPotName, setNewPotName] = useState('');
+  const [newPotAllocated, setNewPotAllocated] = useState('');
 
   // SUPPLY ACTIONS
   const handleAddSupply = (e) => {
@@ -50,7 +52,7 @@ export default function LogisticsFinanceTabs({
     onUpdateFinancials({
       ...financials,
       wages: {
-        ...financials.wages,
+        ...(financials.wages || {}),
         [field]: Number(value)
       }
     });
@@ -68,7 +70,7 @@ export default function LogisticsFinanceTabs({
 
     onUpdateFinancials({
       ...financials,
-      bills: [...financials.bills, newBill]
+      bills: [...(financials.bills || []), newBill]
     });
 
     setNewBillName('');
@@ -82,7 +84,41 @@ export default function LogisticsFinanceTabs({
     });
   };
 
-  // CALENDAR CALCULATION
+  const handleAddPot = (e) => {
+    e.preventDefault();
+    if (!newPotName.trim() || !newPotAllocated) return;
+
+    const newPot = {
+      id: `pot_${Date.now()}`,
+      name: newPotName.trim(),
+      allocated: Number(newPotAllocated),
+      spent: 0
+    };
+
+    onUpdateFinancials({
+      ...financials,
+      pots: [...(financials.pots || []), newPot]
+    });
+
+    setNewPotName('');
+    setNewPotAllocated('');
+  };
+
+  const handleUpdatePotSpent = (id, value) => {
+    const updatedPots = (financials.pots || []).map(p => 
+      p.id === id ? { ...p, spent: Number(value) } : p
+    );
+    onUpdateFinancials({ ...financials, pots: updatedPots });
+  };
+
+  const handleDeletePot = (id) => {
+    onUpdateFinancials({
+      ...financials,
+      pots: financials.pots.filter(p => p.id !== id)
+    });
+  };
+
+  // CALENDAR CHANGES
   const handleMealChange = (day, mealType, value) => {
     onUpdateMeals({
       ...mealCalendar,
@@ -93,11 +129,14 @@ export default function LogisticsFinanceTabs({
     });
   };
 
-  // METRIC DERIVATIONS
+  // DERIVED VALUES
   const totalIncome = (financials.wages?.primary || 0) + (financials.wages?.secondary || 0);
   const totalBills = financials.bills?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
   const netSurplus = totalIncome - totalBills;
   const billBurnRatePercentage = totalIncome > 0 ? Math.min((totalBills / totalIncome) * 100, 100) : 0;
+
+  const totalPotAllocated = financials.pots?.reduce((acc, curr) => acc + curr.allocated, 0) || 0;
+  const leftToAllocate = netSurplus - totalPotAllocated;
 
   const activeSupplies = supplies.filter(s => !s.checked);
   const checkedSupplies = supplies.filter(s => s.checked);
@@ -205,7 +244,7 @@ export default function LogisticsFinanceTabs({
               <div className="space-y-4 flex-1 overflow-y-auto max-h-[380px] pr-1">
                 {/* Active Items */}
                 <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-indigo-400 tracking-wider uppercase block">Pending Acquisitions</span>
+                  <span className="text-[10px] font-bold text-indigo-400 tracking-wider uppercase block">Pending Chores</span>
                   {activeSupplies.length > 0 ? (
                     activeSupplies.map(item => (
                       <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-900/60 rounded-xl border border-slate-800/60 group">
@@ -232,7 +271,7 @@ export default function LogisticsFinanceTabs({
                 {/* Crossed off Items */}
                 {checkedSupplies.length > 0 && (
                   <div className="space-y-2 pt-2 border-t border-slate-800/60">
-                    <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">Acquired Stock</span>
+                    <span className="text-[10px] font-bold text-slate-500 tracking-wider uppercase block">Crossed off</span>
                     {checkedSupplies.map(item => (
                       <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-950/40 rounded-xl border border-slate-900/20 group">
                         <button 
@@ -328,8 +367,9 @@ export default function LogisticsFinanceTabs({
             </div>
           </div>
 
-          {/* Bill Breakdowns Configurations */}
-          <div className="lg:col-span-2 space-y-4">
+          {/* Liabilities & Budget Pots Allocation Wrapper Panel */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Bill Breakdowns Configurations */}
             <div className={`${cardBaseClasses} p-5 border border-slate-800`}>
               <h3 className="text-base font-semibold text-slate-200 mb-3 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-indigo-400" />
@@ -366,7 +406,7 @@ export default function LogisticsFinanceTabs({
                 </div>
               </form>
 
-              <div className="overflow-y-auto max-h-[260px] pr-1 space-y-2">
+              <div className="overflow-y-auto max-h-[180px] pr-1 space-y-2">
                 {financials.bills && financials.bills.length > 0 ? (
                   financials.bills.map((bill) => (
                     <div 
@@ -386,8 +426,89 @@ export default function LogisticsFinanceTabs({
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-slate-500 text-xs italic">
+                  <div className="text-center py-6 text-slate-500 text-xs italic">
                     No outbound fixed debits mapped to this fiscal envelope.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Budget Pots Management Panel */}
+            <div className={`${cardBaseClasses} p-5 border border-slate-800 space-y-4`}>
+              <div className="flex justify-between items-center">
+                <h3 className="text-base font-semibold text-slate-200 flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-indigo-400" />
+                  Piggy Bank Savings Pots
+                </h3>
+                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${leftToAllocate < 0 ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                  Left to Allocate: ${leftToAllocate.toLocaleString()}
+                </span>
+              </div>
+
+              <form onSubmit={handleAddPot} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                  <input
+                    type="text"
+                    value={newPotName}
+                    onChange={(e) => setNewPotName(e.target.value)}
+                    placeholder="e.g., Vacation Savings, Rainy Day..."
+                    className={`${inputBaseClasses} text-xs py-2`}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={newPotAllocated}
+                    onChange={(e) => setNewPotAllocated(e.target.value)}
+                    placeholder="Allocated"
+                    className={`${inputBaseClasses} text-xs py-2`}
+                  />
+                  <button
+                    type="submit"
+                    className="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition-colors shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-3 overflow-y-auto max-h-[180px] pr-1">
+                {financials.pots && financials.pots.length > 0 ? (
+                  financials.pots.map((pot) => {
+                    const remaining = pot.allocated - (pot.spent || 0);
+                    const progress = pot.allocated > 0 ? Math.min(((pot.spent || 0) / pot.allocated) * 100, 100) : 0;
+                    return (
+                      <div key={pot.id} className="p-3 bg-slate-900/40 rounded-xl border border-slate-800/60 space-y-2 group">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-slate-300">{pot.name}</span>
+                          <button onClick={() => handleDeletePot(pot.id)} className="text-slate-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-indigo-500 h-full rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <div className="flex items-center gap-1">
+                            <span>Spent: $</span>
+                            <input
+                              type="number"
+                              value={pot.spent || 0}
+                              onChange={(e) => handleUpdatePotSpent(pot.id, e.target.value)}
+                              className="w-12 bg-slate-800/50 border border-slate-700/40 rounded px-1 text-slate-200 font-medium"
+                            />
+                            <span>/ ${pot.allocated}</span>
+                          </div>
+                          <span className={remaining < 0 ? 'text-rose-400 font-medium' : 'text-slate-400'}>
+                            Rem: ${remaining}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-slate-500 text-xs italic">
+                    No savings pots mapped to this monthly cycle.
                   </div>
                 )}
               </div>
@@ -423,6 +544,14 @@ LogisticsFinanceTabs.propTypes = {
         id: PropTypes.string.isRequired,
         name: PropTypes.string.isRequired,
         amount: PropTypes.number.isRequired
+      })
+    ),
+    pots: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        name: PropTypes.string.isRequired,
+        allocated: PropTypes.number.isRequired,
+        spent: PropTypes.number
       })
     )
   }).isRequired,
