@@ -31,7 +31,6 @@ export default function ProjectTabs({
     const [movedProject] = updatedProjects.splice(index, 1);
     updatedProjects.splice(targetIndex, 0, movedProject);
 
-    // Re-assign explicit sorting orders or update parent array batch state
     updatedProjects.forEach((proj, idx) => {
       onUpdateProject(proj.id, { ...proj, sortOrder: idx });
     });
@@ -42,7 +41,7 @@ export default function ProjectTabs({
     if (!newFolderName.trim()) return;
     
     onCreateProject({
-      name: newFolderName,
+      name: newFolderName.trim(),
       files: [],
       createdAt: new Date().toISOString(),
       sortOrder: projects.length
@@ -64,7 +63,7 @@ export default function ProjectTabs({
 
     onUpdateProject(projectId, {
       ...project,
-      files: [...project.files, newFile]
+      files: [...(project.files || []), newFile]
     });
   };
 
@@ -74,7 +73,7 @@ export default function ProjectTabs({
     if (!project) return;
 
     const updatedFiles = project.files.map(f => 
-      f.id === fileId ? { ...f, name: editFileName, updatedAt: new Date().toISOString() } : f
+      f.id === fileId ? { ...f, name: editFileName.trim(), updatedAt: new Date().toISOString() } : f
     );
 
     onUpdateProject(projectId, { ...project, files: updatedFiles });
