@@ -1,72 +1,61 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Plus, LogOut, CheckCircle2, Circle, Clock, Trash2, 
-  Calendar as CalendarIcon, Shield, Heart, Lightbulb, 
-  User, Flame, Sparkles, TrendingUp, DollarSign, 
-  Layers, Bell, BookOpen, Settings, AlertTriangle, 
-  Menu, X, Check, Lock, ChevronRight, Eye, EyeOff,
-  ChevronDown, MessageSquare, ThumbsUp, Send, Image
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, ChevronRight, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
-// Import your newly refactored components
-import Sidebar from './components/NavigationLayouts'; // Imports NavigationLayoutSidebar as default
-import { NavigationAnchor } from './components/NavigationLayouts';
-import { MetricCard, ProgressBar } from './components/MetricCards';
-import { CategoryBadge, PriorityBadge } from './components/CategoryFilters';
-import { FormField, Input, Select, Textarea } from './components/FormInputs';
-import { TaskRow } from './components/TaskComponents';
-import FamilyWallTab from './components/FamilySpiritualTab'; // Handles wall, feed, and spiritual rules
-import PulseTab from './components/TaskComponents'; // Primary engine for tasks/pulses
+// Import your newly refactored components using their exact named and default exports
+import NavigationLayoutSidebar from './components/NavigationLayouts'; 
+import FamilyWallTab from './components/FamilySpiritualTab'; 
 import ProjectsTab from './components/ProjectTabs';
 import KidsTab from './components/KidsCornerParentTab';
 import { LogisticsTab, FinanceTab } from './components/LogisticsFinanceTabs';
+import { TaskDetailModal } from './components/TaskComponents';
 import { 
-  TaskDetailModal, NotificationsPanel, ActivityLogModal, 
-  PromptModal, ConfirmModal, SettingsModal 
+  SettingsModal, 
+  NotificationsPanel, 
+  ActivityLogModal 
 } from './components/Modals';
-
-// Import Firebase App/Database helper instances 
-import { db, auth } from './firebase'; 
-import { getMonday, inputBaseClasses } from './helpers';
 
 export default function SanctuaryOS() {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
-  const [user, setUser] = useState({ uid: "demo-user", email: "jordan@jsos.com" }); // Fallback/Auth state
   const [activeProfile, setActiveProfile] = useState(() => localStorage.getItem('sanctuary_profile') || null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [showPin, setShowPin] = useState(false);
+  const [selectedProfileForPin, setSelectedProfileForPin] = useState(null);
   
-  // Theme & Navigation
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // Navigation & Theme
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('sanctuary_theme') === 'dark');
   const [activeTab, setActiveTab] = useState('wall');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // Core Data Collections
+  // Core Application Data Pools
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [financeRecords, setFinanceRecords] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [finances, setFinances] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [spiritualLogs, setSpiritualLogs] = useState([]);
+  const [leoData, setLeoData] = useState({ milestones: [], appointments: [], restock: [], rewards: [] });
+  const [leoStats, setLeoStats] = useState({ stars: 0 });
+  const [familyDocs, setFamilyDocs] = useState([]);
+  const [meals, setMeals] = useState([]);
 
-  // UI Modals & Interaction States
+  // UI Open/Close Modals State
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  
-  // System Configuration Mock Data (Syncs with Firebase Realtime/Firestore)
-  const systemUsers = {
-    Jordan: { name: 'Jordan', role: 'Admin', pin: '4321', avatar: '👨‍💻', color: 'indigo' },
-    Bilja: { name: 'Bilja', role: 'Partner', pin: '1234', avatar: '👩‍🎨', color: 'rose' },
-    Leo: { name: 'Leo', role: 'Kid', pin: '0000', avatar: '👦', color: 'amber' }
-  };
+
+  // Household User Registry Map
+  const systemUsers = [
+    { id: '1', name: 'Jordan', role: 'Adult', pin: '1234', avatar: '👨‍💻' },
+    { id: '2', name: 'Biljana', role: 'Adult', pin: '1234', avatar: '👩‍🎨' },
+    { id: '3', name: 'Leo', role: 'Child', pin: '0000', avatar: '👦' }
+  ];
 
   // ============================================================================
-  // SIDE EFFECTS & DATA SYNCING
+  // SIDE EFFECTS
   // ============================================================================
   useEffect(() => {
     if (isDarkMode) {
@@ -74,26 +63,27 @@ export default function SanctuaryOS() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    localStorage.setItem('sanctuary_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
-  // Handle Profile Security/Authentication
-  const handleProfileSelect = (profileName) => {
-    if (systemUsers[profileName].pin === '0000') {
-      setActiveProfile(profileName);
-      localStorage.setItem('sanctuary_profile', profileName);
+  // ============================================================================
+  // INTERACTIVE HANDLERS
+  // ============================================================================
+  const handleProfileSelect = (profile) => {
+    if (profile.role === 'Child') {
+      setActiveProfile(profile.name);
+      localStorage.setItem('sanctuary_profile', profile.name);
     } else {
-      setSelectedProfileForPin(profileName);
+      setSelectedProfileForPin(profile.name);
       setPinInput('');
       setPinError(false);
     }
   };
 
-  const [selectedProfileForPin, setSelectedProfileForPin] = useState(null);
-
   const handlePinSubmit = (e) => {
     e.preventDefault();
-    const targetUser = systemUsers[selectedProfileForPin];
-    if (pinInput === targetUser.pin) {
+    const targetUser = systemUsers.find(u => u.name === selectedProfileForPin);
+    if (targetUser && pinInput === targetUser.pin) {
       setActiveProfile(selectedProfileForPin);
       localStorage.setItem('sanctuary_profile', selectedProfileForPin);
       setSelectedProfileForPin(null);
@@ -104,32 +94,26 @@ export default function SanctuaryOS() {
     }
   };
 
-  const handleLogout = () => {
-    setActiveProfile(null);
-    localStorage.removeItem('sanctuary_profile');
+  const handleLogout = (profileObj) => {
+    // If passing null from sidebar lock, completely reset down to lock screen
+    if (profileObj === null) {
+      setActiveProfile(null);
+      localStorage.removeItem('sanctuary_profile');
+    } else {
+      setActiveProfile(profileObj.name);
+      localStorage.setItem('sanctuary_profile', profileObj.name);
+    }
   };
 
   // ============================================================================
-  // RENDERING INTERCEPTORS (Gateways for Screen Views)
+  // GATEWAY RENDER INTERCEPTORS
   // ============================================================================
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
-          <p className="text-slate-400 font-medium">Initializing Sanctuary Core...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Profile PIN Entry Interceptor Screen
   if (!activeProfile) {
     return (
-      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-slate-940 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
         <div className="w-full max-w-md p-8 mx-4">
           <div className="text-center mb-8">
-            <div className="inline-flex p-3 bg-indigo-600/10 rounded-2xl text-indigo-500 mb-3">
+            <div className="inline-flex p-3 bg-violet-600/10 rounded-2xl text-violet-500 mb-3">
               <Shield className="w-8 h-8" />
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">Sanctuary OS</h1>
@@ -138,35 +122,31 @@ export default function SanctuaryOS() {
 
           {!selectedProfileForPin ? (
             <div className="grid grid-cols-1 gap-4">
-              {Object.keys(systemUsers).map((key) => {
-                const u = systemUsers[key];
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleProfileSelect(key)}
-                    className={`flex items-center justify-between p-4 rounded-xl border transition-all text-left ${
-                      isDarkMode 
-                        ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900' 
-                        : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <span className="text-3xl">{u.avatar}</span>
-                      <div>
-                        <h3 className="font-bold text-lg">{u.name}</h3>
-                        <p className="text-xs text-slate-400">{u.role}</p>
-                      </div>
+              {systemUsers.map((u) => (
+                <button
+                  key={u.id}
+                  onClick={() => handleProfileSelect(u)}
+                  className={`flex items-center justify-between p-4 rounded-[2rem] border transition-all text-left ${
+                    isDarkMode 
+                      ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900' 
+                      : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <span className="text-2xl">{u.avatar}</span>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">{u.name}</h3>
+                      <p className="text-xs text-slate-400">{u.role}</p>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                  </button>
-                );
-              })}
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                </button>
+              ))}
             </div>
           ) : (
             <form onSubmit={handlePinSubmit} className="space-y-6">
               <div className="text-center mb-4">
-                <span className="text-5xl block mb-2">{systemUsers[selectedProfileForPin].avatar}</span>
-                <h3 className="text-xl font-bold">Hello, {systemUsers[selectedProfileForPin].name}</h3>
+                <h3 className="text-xl font-bold">Hello, {selectedProfileForPin}</h3>
                 <p className="text-sm text-slate-400">Enter security PIN access keys</p>
               </div>
 
@@ -176,11 +156,7 @@ export default function SanctuaryOS() {
                   maxLength={4}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                  className={`w-full tracking-[1.5em] text-center text-2xl font-mono py-3 px-4 rounded-xl border ${
-                    pinError 
-                      ? 'border-rose-500 focus:ring-rose-500/20' 
-                      : 'border-slate-700 focus:ring-indigo-500/20'
-                  } bg-slate-900 focus:outline-none focus:ring-4`}
+                  className="w-full tracking-[1.5em] text-center text-2xl font-mono py-3 px-4 rounded-2xl border border-violet-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-4 focus:ring-violet-500/20 text-slate-800 dark:text-white"
                   autoFocus
                 />
                 <button
@@ -202,14 +178,14 @@ export default function SanctuaryOS() {
                 <button
                   type="button"
                   onClick={() => setSelectedProfileForPin(null)}
-                  className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition"
+                  className="w-1/2 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-white font-medium rounded-xl transition text-sm"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={pinInput.length < 4}
-                  className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-xl transition"
+                  className="w-1/2 py-3 bg-gradient-to-r from-violet-500 to-indigo-600 disabled:opacity-50 text-white font-medium rounded-xl transition text-sm"
                 >
                   Verify Access
                 </button>
@@ -221,134 +197,122 @@ export default function SanctuaryOS() {
     );
   }
 
-  // Redirect Route for Child Mode (Leo's Dashboard View)
-  if (activeProfile === 'Leo') {
-    return (
-      <KidsTab 
-        userProfile={systemUsers.Leo} 
-        tasks={tasks.filter(t => t.assignee === 'Leo')} 
-        onLogout={handleLogout}
-        isDarkMode={isDarkMode}
-      />
-    );
-  }
-
   // ============================================================================
-  // ADULT ADMINISTRATIVE WORKSPACE RETURN
+  // WORKSPACE HUB
   // ============================================================================
   return (
-    <div className={`min-h-screen flex transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen flex flex-col lg:flex-row transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
       
-      {/* Sidebar Modular Layout Navigation */}
-     <Sidebar 
-  activeTab={activeTab} 
-  onTabChange={setActiveTab} 
-  systemUsers={Object.values(systemUsers)} // Formats your user object map into an expected iterable array
-  activeProfile={activeProfile} 
-  onSwitchProfile={setActiveProfile} 
-  notifications={notifications}
-/>
-      {/* Main Panel Content Window Container */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-        
-        {/* Core Control Center Header */}
-        <Header 
-          setSidebarOpen={setSidebarOpen}
-          activeProfile={systemUsers[activeProfile]}
-          onOpenSettings={() => setShowSettings(true)}
-          onOpenNotifications={() => setShowNotifications(!showNotifications)}
-          onOpenLogs={() => setShowLogs(true)}
-          notificationCount={notifications.filter(n => !n.read).length}
-        />
+      {/* Complete Responsive Navigation Sidebar Layout Grid Matrix */}
+      <NavigationLayoutSidebar 
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        systemUsers={systemUsers}
+        activeProfile={activeProfile}
+        onSwitchProfile={handleLogout}
+        notifications={notifications}
+      />
 
-        {/* Operational Workspace Screen Wrapper */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+      {/* Primary Desktop Action Windows Workspace */}
+      <main className="flex-1 p-4 lg:p-12 pb-28 lg:pb-14 overflow-y-auto h-screen relative lg:pl-80 md:pl-24">
+        <div className="max-w-5xl mx-auto">
           
           {activeTab === 'wall' && (
             <FamilyWallTab 
-              tasks={tasks} 
-              userProfile={systemUsers[activeProfile]} 
+              tasks={tasks}
+              userProfile={activeProfile}
               posts={posts}
-              setPosts={setPosts}
+              onOpenTask={setSelectedTask}
+              meals={meals}
+              leoStats={leoStats}
+              setActiveTab={setActiveTab}
             />
           )}
 
           {activeTab === 'tasks' && (
-            <PulseTab 
-              tasks={tasks} 
-              setTasks={setTasks} 
-              userProfile={systemUsers[activeProfile]} 
-              onTaskSelect={setSelectedTask}
+            <ProjectsTab 
+              tasks={tasks}
+              projects={projects}
+              userProfile={activeProfile}
+              onOpenTask={setSelectedTask}
+              systemUsers={systemUsers}
             />
           )}
 
           {activeTab === 'projects' && (
             <ProjectsTab 
-              projects={projects} 
-              setProjects={setProjects} 
               tasks={tasks}
+              projects={projects}
+              userProfile={activeProfile}
+              onOpenTask={setSelectedTask}
+              systemUsers={systemUsers}
             />
           )}
 
-          {activeTab === 'kids' && (
-            <KidsTab 
-              userProfile={systemUsers[activeProfile]} 
-              tasks={tasks} 
-              isParentView={true}
+          {activeTab === 'family' && (
+            <LogisticsTab 
+              shoppingList={[]}
+              meals={meals}
             />
           )}
 
           {activeTab === 'logistics' && (
             <LogisticsTab 
-              tasks={tasks}
+              shoppingList={[]}
+              meals={meals}
             />
           )}
 
           {activeTab === 'finance' && (
             <FinanceTab 
-              records={financeRecords} 
-              setRecords={setFinanceRecords}
+              finances={finances}
             />
           )}
 
-        </main>
-      </div>
+          {activeTab === 'kids' && (
+            <KidsTab 
+              leoData={leoData}
+              leoStats={leoStats}
+              tasks={tasks}
+              userProfile={activeProfile}
+              isParentView={true}
+            />
+          )}
 
-      {/* ============================================================================
-          GLOBAL SYSTEM MODALS 
-         ============================================================================ */}
+        </div>
+      </main>
+
+      {/* Global Interface Modals */}
+      {selectedTask && (
+        <TaskDetailModal 
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          comments={[]}
+          userProfile={activeProfile}
+          systemUsers={systemUsers}
+        />
+      )}
+
       {showSettings && (
         <SettingsModal 
-          onClose={() => setShowSettings(false)} 
-          isDarkMode={isDarkMode} 
-          setIsDarkMode={setIsDarkMode} 
+          onClose={() => setShowSettings(false)}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
           systemUsers={systemUsers}
         />
       )}
 
       {showNotifications && (
         <NotificationsPanel 
-          notifications={notifications} 
-          setNotifications={setNotifications} 
+          notifications={notifications}
           onClose={() => setShowNotifications(false)}
         />
       )}
 
-      {showLogs && (
+      {showActivity && (
         <ActivityLogModal 
-          logs={logs} 
-          onClose={() => setShowLogs(false)}
-        />
-      )}
-
-      {selectedTask && (
-        <TaskDetailModal 
-          task={selectedTask} 
-          onClose={() => setSelectedTask(null)}
-          onSave={(updatedTask) => {
-            setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
-            setSelectedTask(null);
-          }}
+          logs={activityLogs}
+          onClose={() => setShowActivity(false)}
         />
       )}
 
