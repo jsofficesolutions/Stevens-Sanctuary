@@ -1,74 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ChevronRight, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Shield, ChevronRight, Eye, EyeOff, AlertTriangle, Heart } from 'lucide-react';
 
-// Import your newly refactored components using their exact named and default exports
 import NavigationLayoutSidebar from './components/NavigationLayouts'; 
-import FamilyWallTab from './components/FamilySpiritualTab'; 
+import FamilySpiritualTab from './components/FamilySpiritualTab'; 
 import ProjectsTab from './components/ProjectTabs';
 import KidsTab from './components/KidsCornerParentTab';
 import LogisticsFinanceTabs from './components/LogisticsFinanceTabs';
 import { TaskDetailModal } from './components/TaskComponents';
-import { 
-  SettingsModal, 
-  NotificationsPanel, 
-  ActivityLogModal 
-} from './components/Modals';
+import { SettingsModal, NotificationsPanel, ActivityLogModal } from './components/Modals';
 
 export default function SanctuaryOS() {
-  // ============================================================================
-  // STATE MANAGEMENT
-  // ============================================================================
   const [activeProfile, setActiveProfile] = useState(() => localStorage.getItem('sanctuary_profile') || null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [selectedProfileForPin, setSelectedProfileForPin] = useState(null);
   
-  // Navigation & Theme
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('sanctuary_theme') === 'dark');
-  const [activeTab, setActiveTab] = useState('wall');
+  const [activeTab, setActiveTab] = useState('logistics');
   
-  // Core Application Data Pools
+  // App State Properly Initialized
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [posts, setPosts] = useState([]);
-  const [finances, setFinances] = useState([]);
-  const [activityLogs, setActivityLogs] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [spiritualLogs, setSpiritualLogs] = useState([]);
-  const [leoData, setLeoData] = useState({ milestones: [], appointments: [], restock: [], rewards: [] });
-  const [leoStats, setLeoStats] = useState({ stars: 0 });
+  const [supplies, setSupplies] = useState([]);
+  const [finances, setFinances] = useState({ wages: {}, bills: [], pots: [] });
+  const [spiritualLogs, setSpiritualLogs] = useState({ dailyChecklist: {} });
   const [familyDocs, setFamilyDocs] = useState([]);
-  const [meals, setMeals] = useState([]);
+  const [kidsTasks, setKidsTasks] = useState([]);
+  const [kidsRewards, setKidsRewards] = useState([]);
+  
+  const [meals, setMeals] = useState({
+    Monday: { lunch: '', dinner: '' },
+    Tuesday: { lunch: '', dinner: '' },
+    Wednesday: { lunch: '', dinner: '' },
+    Thursday: { lunch: '', dinner: '' },
+    Friday: { lunch: '', dinner: '' },
+    Saturday: { lunch: '', dinner: '' },
+    Sunday: { lunch: '', dinner: '' },
+  });
 
-  // UI Open/Close Modals State
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
-  // Household User Registry Map
   const systemUsers = [
-    { id: '1', name: 'Jordan', role: 'Adult', pin: '1234', avatar: '👨‍💼' },
-    { id: '2', name: 'Biljana', role: 'Adult', pin: '1234', avatar: '👩‍💼' },
-    { id: '3', name: 'Leo', role: 'Child', pin: '0000', avatar: '👦' }
+    { id: '1', name: 'Jordan', role: 'Adult', pin: '1234', avatar: '👨🏽' },
+    { id: '2', name: 'Biljana', role: 'Adult', pin: '1234', avatar: '👩🏻' },
+    { id: '3', name: 'Leo', role: 'Child', pin: '0000', avatar: '👦🏽' }
   ];
 
-  // ============================================================================
-  // SIDE EFFECTS
-  // ============================================================================
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
     localStorage.setItem('sanctuary_theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
-  // ============================================================================
-  // INTERACTIVE HANDLERS
-  // ============================================================================
   const handleProfileSelect = (profile) => {
     if (profile.role === 'Child') {
       setActiveProfile(profile.name);
@@ -95,7 +82,6 @@ export default function SanctuaryOS() {
   };
 
   const handleLogout = (profileObj) => {
-    // If passing null from sidebar lock, completely reset down to lock screen
     if (profileObj === null) {
       setActiveProfile(null);
       localStorage.removeItem('sanctuary_profile');
@@ -105,19 +91,16 @@ export default function SanctuaryOS() {
     }
   };
 
-  // ============================================================================
-  // GATEWAY RENDER INTERCEPTORS
-  // ============================================================================
   if (!activeProfile) {
     return (
-      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-orange-50 text-slate-800'}`}>
         <div className="w-full max-w-md p-8 mx-4">
           <div className="text-center mb-8">
-            <div className="inline-flex p-3 bg-violet-600/10 rounded-2xl text-violet-500 mb-3">
-              <Shield className="w-8 h-8" />
+            <div className="inline-flex p-4 bg-orange-500/10 rounded-full text-orange-500 mb-4 shadow-sm border border-orange-500/20">
+              <Heart className="w-8 h-8 fill-orange-500/20" />
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Sanctuary OS</h1>
-            <p className="text-slate-400 mt-2">Select your identity space</p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-slate-100">Sanctuary</h1>
+            <p className="text-slate-500 mt-2 font-medium">Who is using the family hub?</p>
           </div>
 
           {!selectedProfileForPin ? (
@@ -126,28 +109,28 @@ export default function SanctuaryOS() {
                 <button
                   key={u.id}
                   onClick={() => handleProfileSelect(u)}
-                  className={`flex items-center justify-between p-4 rounded-[2rem] border transition-all text-left ${
+                  className={`flex items-center justify-between p-4 rounded-[1.5rem] border transition-all text-left ${
                     isDarkMode 
                       ? 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900' 
-                      : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'
+                      : 'bg-white border-slate-200 hover:border-orange-300 hover:shadow-md shadow-sm'
                   }`}
                 >
                   <div className="flex items-center space-x-4">
-                    <span className="text-2xl">{u.avatar}</span>
+                    <span className="text-3xl bg-slate-50 dark:bg-slate-800 p-2 rounded-full">{u.avatar}</span>
                     <div>
-                      <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">{u.name}</h3>
-                      <p className="text-xs text-slate-400">{u.role}</p>
+                      <h3 className="font-bold text-base text-slate-800 dark:text-slate-200">{u.name}</h3>
+                      <p className="text-xs text-slate-400 font-medium">{u.role}</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <ChevronRight className="w-5 h-5 text-slate-300" />
                 </button>
               ))}
             </div>
           ) : (
             <form onSubmit={handlePinSubmit} className="space-y-6">
               <div className="text-center mb-4">
-                <h3 className="text-xl font-bold">Hello, {selectedProfileForPin}</h3>
-                <p className="text-sm text-slate-400">Enter security PIN access keys</p>
+                <h3 className="text-xl font-bold">Welcome back, {selectedProfileForPin}</h3>
+                <p className="text-sm text-slate-500">Enter your PIN to unlock</p>
               </div>
 
               <div className="relative">
@@ -156,21 +139,21 @@ export default function SanctuaryOS() {
                   maxLength={4}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full tracking-[1.5em] text-center text-2xl font-mono py-3 px-4 rounded-2xl border border-violet-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-990 focus:outline-none focus:ring-4 focus:ring-violet-500/20 text-slate-800 dark:text-white"
+                  className="w-full tracking-[1em] text-center text-3xl font-mono py-4 px-4 rounded-2xl border border-orange-200 dark:border-slate-800 bg-white dark:bg-slate-900 focus:outline-none focus:ring-4 focus:ring-orange-500/20 text-slate-800 dark:text-white shadow-sm"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowPin(!showPin)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
-                  {showPin ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPin ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
                 </button>
               </div>
 
               {pinError && (
-                <p className="text-rose-500 text-sm text-center flex items-center justify-center gap-1">
-                  <AlertTriangle className="w-4 h-4" /> Security identification mismatch.
+                <p className="text-rose-500 text-sm font-medium text-center flex items-center justify-center gap-1.5 bg-rose-50 dark:bg-rose-500/10 py-2 rounded-lg">
+                  <AlertTriangle className="w-4 h-4" /> Incorrect PIN. Try again.
                 </p>
               )}
 
@@ -178,16 +161,16 @@ export default function SanctuaryOS() {
                 <button
                   type="button"
                   onClick={() => setSelectedProfileForPin(null)}
-                  className="w-1/2 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-white font-medium rounded-xl transition text-sm"
+                  className="w-1/3 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-white font-bold rounded-xl transition text-sm"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={pinInput.length < 4}
-                  className="w-1/2 py-3 bg-gradient-to-r from-violet-500 to-indigo-600 disabled:opacity-50 text-white font-medium rounded-xl transition text-sm"
+                  className="w-2/3 py-3.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md shadow-orange-500/20 text-sm"
                 >
-                  Verify Access
+                  Unlock
                 </button>
               </div>
             </form>
@@ -197,45 +180,28 @@ export default function SanctuaryOS() {
     );
   }
 
-  // ============================================================================
-  // WORKSPACE HUB
-  // ============================================================================
   return (
-    <div className={`min-h-screen flex flex-col lg:flex-row transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen flex flex-col lg:flex-row transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#faf9f8] text-slate-800'}`}>
       
-      {/* Complete Responsive Navigation Sidebar Layout Grid Matrix */}
       <NavigationLayoutSidebar 
         activeTab={activeTab}
         onTabChange={setActiveTab}
         systemUsers={systemUsers}
         activeProfile={activeProfile}
         onSwitchProfile={handleLogout}
-        notifications={notifications}
+        notifications={[]}
       />
 
-      {/* Primary Desktop Action Windows Workspace */}
-      <main className="flex-1 p-4 lg:p-12 pb-28 lg:pb-14 overflow-y-auto h-screen relative lg:pl-80 md:pl-24">
-        <div className="max-w-5xl mx-auto">
+      <main className="flex-1 p-4 lg:p-8 pb-28 lg:pb-8 overflow-y-auto h-screen relative lg:pl-80 md:pl-24">
+        <div className="max-w-4xl mx-auto mt-4">
           
-          {activeTab === 'wall' && (
-            <FamilyWallTab 
-              tasks={tasks}
-              userProfile={activeProfile}
-              posts={posts}
-              onOpenTask={setSelectedTask}
-              meals={meals}
-              leoStats={leoStats}
-              setActiveTab={setActiveTab}
-            />
-          )}
-
-          {activeTab === 'tasks' && (
-            <ProjectsTab 
-              tasks={tasks}
-              projects={projects}
-              userProfile={activeProfile}
-              onOpenTask={setSelectedTask}
-              systemUsers={systemUsers}
+          {activeTab === 'family' && (
+            <FamilySpiritualTab 
+              spiritualData={spiritualLogs}
+              familyDocs={familyDocs}
+              onUpdateSpiritual={setSpiritualLogs}
+              onAddFamilyDoc={(doc) => setFamilyDocs([...familyDocs, doc])}
+              onDeleteFamilyDoc={(id) => setFamilyDocs(familyDocs.filter(d => d.id !== id))}
             />
           )}
 
@@ -246,56 +212,39 @@ export default function SanctuaryOS() {
               userProfile={activeProfile}
               onOpenTask={setSelectedTask}
               systemUsers={systemUsers}
+              onUpdateProject={() => {}}
+              onDeleteProject={() => {}}
+              onCreateProject={() => {}}
             />
           )}
 
-          {activeTab === 'family' && (
+          {(activeTab === 'logistics' || activeTab === 'finance') && (
             <LogisticsFinanceTabs 
-              mealCalendar={{}}
-              supplies={[]}
-              financials={{}}
-              onUpdateMeals={() => {}}
-              onUpdateSupplies={() => {}}
-              onUpdateFinancials={() => {}}
-            />
-          )}
-
-          {activeTab === 'logistics' && (
-            <LogisticsFinanceTabs 
-              mealCalendar={{}}
-              supplies={[]}
-              financials={{}}
-              onUpdateMeals={() => {}}
-              onUpdateSupplies={() => {}}
-              onUpdateFinancials={() => {}}
-            />
-          )}
-
-          {activeTab === 'finance' && (
-            <LogisticsFinanceTabs 
-              mealCalendar={{}}
-              supplies={[]}
-              financials={{}}
-              onUpdateMeals={() => {}}
-              onUpdateSupplies={() => {}}
-              onUpdateFinancials={() => {}}
+              activeTab={activeTab}
+              mealCalendar={meals}
+              supplies={supplies}
+              financials={finances}
+              onUpdateMeals={setMeals}
+              onUpdateSupplies={setSupplies}
+              onUpdateFinancials={setFinances}
+              onTabChange={setActiveTab}
             />
           )}
 
           {activeTab === 'kids' && (
             <KidsTab 
-              leoData={leoData}
-              leoStats={leoStats}
-              tasks={tasks}
-              userProfile={activeProfile}
-              isParentView={true}
+              kidsTasks={kidsTasks}
+              kidsRewards={kidsRewards}
+              onAddTask={(task) => setKidsTasks([...kidsTasks, task])}
+              onDeleteTask={(id) => setKidsTasks(kidsTasks.filter(t => t.id !== id))}
+              onProcessRewardOverride={(id, status) => setKidsRewards(kidsRewards.map(r => r.id === id ? { ...r, status } : r))}
             />
           )}
 
         </div>
       </main>
 
-      {/* Global Interface Modals */}
+      {/* Modals remain structurally identical */}
       {selectedTask && (
         <TaskDetailModal 
           task={selectedTask}
@@ -314,21 +263,6 @@ export default function SanctuaryOS() {
           systemUsers={systemUsers}
         />
       )}
-
-      {showNotifications && (
-        <NotificationsPanel 
-          notifications={notifications}
-          onClose={() => setShowNotifications(false)}
-        />
-      )}
-
-      {showActivity && (
-        <ActivityLogModal 
-          logs={activityLogs}
-          onClose={() => setShowActivity(false)}
-        />
-      )}
-
     </div>
   );
 }
