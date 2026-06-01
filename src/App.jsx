@@ -6,7 +6,7 @@ import NavigationLayoutSidebar from './components/NavigationLayouts';
 import FamilyWallTab from './components/FamilySpiritualTab'; 
 import ProjectsTab from './components/ProjectTabs';
 import KidsTab from './components/KidsCornerParentTab';
-import { LogisticsTab, FinanceTab } from './components/LogisticsFinanceTabs';
+import LogisticsFinanceTabs from './components/LogisticsFinanceTabs';
 import { TaskDetailModal } from './components/TaskComponents';
 import { 
   SettingsModal, 
@@ -49,8 +49,8 @@ export default function SanctuaryOS() {
 
   // Household User Registry Map
   const systemUsers = [
-    { id: '1', name: 'Jordan', role: 'Adult', pin: '1234', avatar: '👨‍💻' },
-    { id: '2', name: 'Biljana', role: 'Adult', pin: '1234', avatar: '👩‍🎨' },
+    { id: '1', name: 'Jordan', role: 'Adult', pin: '1234', avatar: '👨‍💼' },
+    { id: '2', name: 'Biljana', role: 'Adult', pin: '1234', avatar: '👩‍💼' },
     { id: '3', name: 'Leo', role: 'Child', pin: '0000', avatar: '👦' }
   ];
 
@@ -156,7 +156,7 @@ export default function SanctuaryOS() {
                   maxLength={4}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                  className="w-full tracking-[1.5em] text-center text-2xl font-mono py-3 px-4 rounded-2xl border border-violet-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-4 focus:ring-violet-500/20 text-slate-800 dark:text-white"
+                  className="w-full tracking-[1.5em] text-center text-2xl font-mono py-3 px-4 rounded-2xl border border-violet-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-990 focus:outline-none focus:ring-4 focus:ring-violet-500/20 text-slate-800 dark:text-white"
                   autoFocus
                 />
                 <button
@@ -250,22 +250,35 @@ export default function SanctuaryOS() {
           )}
 
           {activeTab === 'family' && (
-            <LogisticsTab 
-              shoppingList={[]}
-              meals={meals}
+            <LogisticsFinanceTabs 
+              mealCalendar={{}}
+              supplies={[]}
+              financials={{}}
+              onUpdateMeals={() => {}}
+              onUpdateSupplies={() => {}}
+              onUpdateFinancials={() => {}}
             />
           )}
 
           {activeTab === 'logistics' && (
-            <LogisticsTab 
-              shoppingList={[]}
-              meals={meals}
+            <LogisticsFinanceTabs 
+              mealCalendar={{}}
+              supplies={[]}
+              financials={{}}
+              onUpdateMeals={() => {}}
+              onUpdateSupplies={() => {}}
+              onUpdateFinancials={() => {}}
             />
           )}
 
           {activeTab === 'finance' && (
-            <FinanceTab 
-              finances={finances}
+            <LogisticsFinanceTabs 
+              mealCalendar={{}}
+              supplies={[]}
+              financials={{}}
+              onUpdateMeals={() => {}}
+              onUpdateSupplies={() => {}}
+              onUpdateFinancials={() => {}}
             />
           )}
 
