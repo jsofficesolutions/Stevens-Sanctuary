@@ -20,6 +20,7 @@ import { PulseTab } from './components/PulseTab';
 import { ProjectsTab } from './components/ProjectsTab';
 import { FamilyTab } from './components/FamilyTab';
 import { KidsTab } from './components/KidsCornerParentTab';
+import { LeoDashboard } from './components/KidsTab'; 
 import { LogisticsTab, FinanceTab } from './components/LogisticsFinanceTabs';
 import { TaskDetailModal } from './components/TaskComponents';
 import { NotificationsPanel, ActivityLogModal, SettingsModal } from './components/Modals';
