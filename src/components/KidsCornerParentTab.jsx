@@ -1,4 +1,10 @@
-function KidsTab({ leoData, db, appId, user, logActivity, leoStats, tasks, toggleTask, userProfile }) {
+import React, { useState } from 'react'; // <-- Add
+import { Star, Timer, Repeat, Plus, Circle, Trash2, CheckCircle2, Gift, ShoppingCart } from 'lucide-react'; // <-- Add
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // <-- Add
+import { cardBaseClasses, inputBaseClasses } from '../helpers'; // <-- Add
+
+export function KidsTab({ leoData, db, appId, user, logActivity, leoStats, tasks, toggleTask, userProfile }) {
+
     const [newItem, setNewItem] = useState('');
     const [newRewardCost, setNewRewardCost] = useState('');
     const [isPermanentReward, setIsPermanentReward] = useState(false);
