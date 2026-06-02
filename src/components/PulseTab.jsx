@@ -1,4 +1,11 @@
-function PulseTab({ tasks, userProfile, onOpenTask, db, appId, user, toggleTask, sendNotification, logActivity, systemUsers, leoData }) {
+import React, { useState } from 'react'; // <-- Add
+import { Gift, CalendarClock, Timer, Repeat, ListTodo, BellRing, CheckCircle2 } from 'lucide-react'; // <-- Add
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore'; // <-- Add
+import { cardBaseClasses, WEEK_DAYS } from '../helpers'; // <-- Add
+import { TaskRow } from './TaskComponents'; // <-- Add
+
+export function PulseTab({ tasks, userProfile, onOpenTask, db, appId, user, toggleTask, sendNotification, logActivity, systemUsers, leoData }) {
+
     const [newTask, setNewTask] = useState('');
     const [newAssignee, setNewAssignee] = useState(userProfile);
     const [newDueDate, setNewDueDate] = useState('');
