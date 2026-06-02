@@ -1,4 +1,6 @@
-const getMonday = (offset = 0) => {
+// Add 'export' to each declaration below:
+
+export const getMonday = (offset = 0) => {
     const d = new Date();
     const day = d.getDay() || 7; 
     d.setDate(d.getDate() - day + 1 + (offset * 7));
@@ -6,12 +8,12 @@ const getMonday = (offset = 0) => {
     return d.toISOString().split('T')[0];
 };
 
-const getCurrentMonthId = () => {
+export const getCurrentMonthId = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-const calculateNextDueDate = (dateStr, recurrence, specificDays = []) => {
+export const calculateNextDueDate = (dateStr, recurrence, specificDays = []) => {
     let d = dateStr ? new Date(dateStr) : new Date();
     
     if (recurrence === 'daily') {
@@ -38,7 +40,7 @@ const calculateNextDueDate = (dateStr, recurrence, specificDays = []) => {
     return d.toISOString().split('T')[0];
 };
 
-const formatDueDate = (dateStr) => {
+export const formatDueDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     const today = new Date();
@@ -54,8 +56,8 @@ const formatDueDate = (dateStr) => {
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-const WEEK_DAYS = [{l:'M', v:1}, {l:'T', v:2}, {l:'W', v:3}, {l:'T', v:4}, {l:'F', v:5}, {l:'S', v:6}, {l:'S', v:7}];
+export const WEEK_DAYS = [{l:'M', v:1}, {l:'T', v:2}, {l:'W', v:3}, {l:'T', v:4}, {l:'F', v:5}, {l:'S', v:6}, {l:'S', v:7}];
 
 // UI Helpers
-const inputBaseClasses = "bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition-all shadow-sm placeholder:text-slate-400";
-const cardBaseClasses = "bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-[1.5rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]";
+export const inputBaseClasses = "bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 transition-all shadow-sm placeholder:text-slate-400";
+export const cardBaseClasses = "bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-[1.5rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]";
