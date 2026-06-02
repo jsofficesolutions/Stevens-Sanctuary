@@ -2,7 +2,13 @@
 // === src/components/LogisticsFinanceTabs.jsx === (LogisticsTab segment)
 // TAB 4: LOGISTICS (Meals & Groceries)
 // ============================================================================
-function LogisticsTab({ shoppingList, meals, db, appId, user, logActivity }) {
+import React, { useState } from 'react'; // <-- Add
+import { Utensils, ShoppingCart, Plus, Circle, Trash2, CheckCircle2, Wallet, ArrowRight, PiggyBank } from 'lucide-react'; // <-- Add
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore'; // <-- Add
+import { getMonday, getCurrentMonthId, cardBaseClasses, inputBaseClasses } from '../helpers'; // <-- Add
+
+export function LogisticsTab({ shoppingList, meals, db, appId, user, logActivity }) {
+    
     const [newItem, setNewItem] = useState('');
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const weekId = getMonday(0);
@@ -83,7 +89,7 @@ function LogisticsTab({ shoppingList, meals, db, appId, user, logActivity }) {
 // === src/components/LogisticsFinanceTabs.jsx === (FinanceTab segment)
 // TAB 5: FINANCES (Multiple Incomes, Fixed/Temp Outgoings, Pots)
 // ============================================================================
-function FinanceTab({ finances, db, appId, user }) {
+export function FinanceTab({ finances, db, appId, user }) {
     const monthId = getCurrentMonthId();
     const currentFinance = finances.find(f => f.id === monthId) || { incomes: [], outgoings: [], pots: [] };
     
