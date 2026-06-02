@@ -179,11 +179,13 @@ export function FinanceTab({ finances, db, appId, user }) {
                 <div className="space-y-8">
                     <div className={cardBaseClasses}>
                         <h3 className="font-black text-2xl mb-6 flex items-center gap-3 tracking-tight"><div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl"><Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400"/></div> Income</h3>
-                        <form onSubmit={addIncome} className="flex gap-2 mb-6 bg-slate-50 dark:bg-slate-950 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-                            <input type="text" value={newIncomeName} onChange={e=>setNewIncomeName(e.target.value)} placeholder="Source..." className="flex-1 bg-transparent outline-none text-sm font-bold px-3 placeholder:text-slate-400" />
-                            <input type="number" value={newIncomeAmt} onChange={e=>setNewIncomeAmt(e.target.value)} placeholder="£" className="w-20 bg-transparent outline-none text-sm font-bold border-l border-slate-200 dark:border-slate-700 pl-3 placeholder:text-slate-400" />
-                            <button type="submit" className="bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"><Plus className="w-5 h-5"/></button>
-                        </form>
+                        <form onSubmit={addIncome} className="flex gap-2 mb-6">
+                            <input type="text" value={newIncomeName} onChange={e=>setNewIncomeName(e.target.value)} placeholder="Source name (e.g., Salary)..." className={inputBaseClasses + " flex-1"} />
+                            <input type="number" value={newIncomeAmt} onChange={e=>setNewIncomeAmt(e.target.value)} placeholder="£ Amount" className={inputBaseClasses + " w-28"} />
+                            <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 rounded-2xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0">
+                        <Plus className="w-5 h-5"/>
+                    </button>
+            </form>
                         <div className="space-y-3">
                             {(currentFinance.incomes||[]).map(inc => (
                                 <div key={inc.id} className="flex justify-between items-center p-4 bg-slate-50/50 dark:bg-slate-950/50 rounded-2xl border border-slate-100 dark:border-slate-800/50 group transition-colors hover:border-emerald-200 dark:hover:border-emerald-800/50">
