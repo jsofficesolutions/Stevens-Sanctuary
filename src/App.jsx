@@ -1,4 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  signInWithCustomToken, 
+  signInAnonymously, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  setDoc 
+} from 'firebase/firestore';
+import { auth, db, appId } from './firebase';
+import { formatDueDate, calculateNextDueDate } from './helpers';
+
+// Keep your sub-component imports here if they are in other files, for example:
+import { PulseTab } from './components/PulseTab';
+import { ProjectsTab } from './components/ProjectsTab';
+import { FamilyTab } from './components/FamilyTab';
+import { KidsTab } from './components/KidsCornerParentTab';
+import { LogisticsTab, FinanceTab } from './components/LogisticsFinanceTabs';
+import { TaskDetailModal } from './components/TaskComponents';
+import { NotificationsPanel, ActivityLogModal, SettingsModal } from './components/Modals';
+import { NavItem } from './components/NavigationLayouts';
+import { Star, Zap, Briefcase, Users, Gamepad2, ShoppingCart, Wallet, Lock, History, Settings, BellRing } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
