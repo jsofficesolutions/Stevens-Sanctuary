@@ -117,21 +117,24 @@ export function ProjectsTab({ tasks, projects, userProfile, onOpenTask, db, appI
                 <p className="text-slate-500 text-lg font-medium">Manage household projects, chores, and sub-sections.</p>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <form onSubmit={handleAddTask} className={cardBaseClasses}>
-                    <h3 className="font-black text-xs text-slate-400 uppercase tracking-[0.15em] mb-5">New Task / Chore</h3>
-                    <div className="space-y-4">
-                        <input type="text" value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="Task name..." className={inputBaseClasses + " w-full"} required />
-                        
-                        <div className="flex gap-3">
-                            <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
-                                <option value="">Unassigned</option>
-                                {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
-                                <option value="Both">Joint</option>
-                            </select>
-                            <input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"} title="Start Date / Next Due" />
-                            <input type="number" value={newTimeLimit} onChange={e=>setNewTimeLimit(e.target.value)} placeholder="Mins (opt)" className={inputBaseClasses + " w-24 py-2 text-sm font-bold"} title="Optional Time Limit in Minutes" />
-                        </div>
+<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="flex flex-col gap-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assignee</label>
+        <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"}>
+            <option value="">Unassigned</option>
+            {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
+            <option value="Both">Joint</option>
+        </select>
+    </div>
+    <div className="flex flex-col gap-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Due Date</label>
+        <input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
+    </div>
+    <div className="flex flex-col gap-1.5">
+        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Limit</label>
+        <input type="number" value={newTimeLimit} onChange={e=>setNewTimeLimit(e.target.value)} placeholder="Mins (opt)" className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
+    </div>
+</div>
 
                         <div className="flex flex-wrap gap-2 items-center">
                             <select value={newRecurrence} onChange={e=>{setNewRecurrence(e.target.value); setNewRecurrenceDays([]);}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
