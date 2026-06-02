@@ -1,4 +1,10 @@
-function FamilyTab({ spiritualLogs, systemUsers, db, appId, user, tasks, familyDocs, logActivity }) {
+import React, { useState } from 'react'; // <-- Add
+import { CheckCircle2, ListTodo, Users, BookOpen, FileText, Plus, Link as LinkIcon, Trash2, Circle } from 'lucide-react'; // <-- Add
+import { doc, setDoc, addDoc, collection, deleteDoc } from 'firebase/firestore'; // <-- Add
+import { getMonday, cardBaseClasses, inputBaseClasses } from '../helpers'; // <-- Add
+
+export function FamilyTab({ spiritualLogs, systemUsers, db, appId, user, tasks, familyDocs, logActivity }) {
+
     const currentWeekId = getMonday(0);
     const adults = systemUsers.filter(u => u.role === 'Adult').map(u => u.name);
     const children = systemUsers.filter(u => u.role === 'Child').map(u => u.name);
