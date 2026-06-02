@@ -110,70 +110,75 @@ export function ProjectsTab({ tasks, projects, userProfile, onOpenTask, db, appI
         }
     };
 
-    return (
+return (
         <div className="space-y-10 animate-in fade-in duration-500">
             <header>
                 <h2 className="text-4xl font-black mb-2 tracking-tight">Projects & Folders</h2>
                 <p className="text-slate-500 text-lg font-medium">Manage household projects, chores, and sub-sections.</p>
             </header>
 
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assignee</label>
-        <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"}>
-            <option value="">Unassigned</option>
-            {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
-            <option value="Both">Joint</option>
-        </select>
-    </div>
-    <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Due Date</label>
-        <input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
-    </div>
-    <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Limit</label>
-        <input type="number" value={newTimeLimit} onChange={e=>setNewTimeLimit(e.target.value)} placeholder="Mins (opt)" className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
-    </div>
-</div>
-
-                        <div className="flex flex-wrap gap-2 items-center">
-                            <select value={newRecurrence} onChange={e=>{setNewRecurrence(e.target.value); setNewRecurrenceDays([]);}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
-                                <option value="none">Does not repeat</option>
-                                <option value="daily">Repeats Daily</option>
-                                <option value="weekly">Repeats Weekly</option>
-                                <option value="biweekly">Repeats Biweekly</option>
-                                <option value="monthly">Repeats Monthly</option>
+            {/* Added container layout and the missing opening form wrapper */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <form onSubmit={handleAddTask} className={cardBaseClasses + " lg:col-span-2 space-y-6"}>
+                    <h3 className="font-black text-xs text-slate-400 uppercase tracking-[0.15em] mb-2">Quick Add Task</h3>
+                    <input type="text" value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="What needs doing?" className={inputBaseClasses + " w-full"} />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assignee</label>
+                            <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"}>
+                                <option value="">Unassigned</option>
+                                {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
+                                <option value="Both">Joint</option>
                             </select>
-                            {(newRecurrence === 'weekly' || newRecurrence === 'biweekly') && (
-                                <div className="flex gap-1 ml-2">
-                                    {WEEK_DAYS.map((d, i) => (
-                                        <button key={i} type="button" onClick={(e) => { e.preventDefault(); if(newRecurrenceDays.includes(d.v)) setNewRecurrenceDays(newRecurrenceDays.filter(day => day !== d.v)); else setNewRecurrenceDays([...newRecurrenceDays, d.v]); }}
-                                            className={`w-8 h-8 rounded-full text-[10px] font-bold shadow-sm transition-all ${newRecurrenceDays.includes(d.v) ? 'bg-indigo-500 text-white scale-110' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
-                                            {d.l}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                        {newRecurrence !== 'none' && (
-                            <div className={inputBaseClasses + " flex items-center gap-3 py-2"}>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">Recur Until (Optional)</span>
-                                <input type="date" value={newRecurEndDate} onChange={e=>setNewRecurEndDate(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-slate-700 dark:text-slate-200" />
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Due Date</label>
+                            <input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Limit</label>
+                            <input type="number" value={newTimeLimit} onChange={e=>setNewTimeLimit(e.target.value)} placeholder="Mins (opt)" className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <select value={newRecurrence} onChange={e=>{setNewRecurrence(e.target.value); setNewRecurrenceDays([]);}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
+                            <option value="none">Does not repeat</option>
+                            <option value="daily">Repeats Daily</option>
+                            <option value="weekly">Repeats Weekly</option>
+                            <option value="biweekly">Repeats Biweekly</option>
+                            <option value="monthly">Repeats Monthly</option>
+                        </select>
+                        {(newRecurrence === 'weekly' || newRecurrence === 'biweekly') && (
+                            <div className="flex gap-1 ml-2">
+                                {WEEK_DAYS.map((d, i) => (
+                                    <button key={i} type="button" onClick={(e) => { e.preventDefault(); if(newRecurrenceDays.includes(d.v)) setNewRecurrenceDays(newRecurrenceDays.filter(day => day !== d.v)); else setNewRecurrenceDays([...newRecurrenceDays, d.v]); }}
+                                        className={`w-8 h-8 rounded-full text-[10px] font-bold shadow-sm transition-all ${newRecurrenceDays.includes(d.v) ? 'bg-indigo-500 text-white scale-110' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
+                                        {d.l}
+                                    </button>
+                                ))}
                             </div>
                         )}
-
-                        <div className="flex gap-3">
-                            <select value={selectedProject} onChange={e=>{setSelectedProject(e.target.value); setSelectedSection('General');}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
-                                <option value="">General (No Project)</option>
-                                {sortedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                            {selectedProject && (
-                                <select value={selectedSection} onChange={e=>setSelectedSection(e.target.value)} className={inputBaseClasses + " w-1/3 py-2 text-sm font-bold"}>
-                                    {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            )}
-                            <button type="submit" className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-5 rounded-xl font-bold hover:shadow-lg shadow-rose-500/20 transition-all active:scale-95"><Plus className="w-5 h-5"/></button>
+                    </div>
+                    {newRecurrence !== 'none' && (
+                        <div className={inputBaseClasses + " flex items-center gap-3 py-2"}>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">Recur Until (Optional)</span>
+                            <input type="date" value={newRecurEndDate} onChange={e=>setNewRecurEndDate(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-slate-700 dark:text-slate-200" />
                         </div>
+                    )}
+
+                    <div className="flex gap-3">
+                        <select value={selectedProject} onChange={e=>{setSelectedProject(e.target.value); setSelectedSection('General');}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
+                            <option value="">General (No Project)</option>
+                            {sortedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        {selectedProject && (
+                            <select value={selectedSection} onChange={e=>setSelectedSection(e.target.value)} className={inputBaseClasses + " w-1/3 py-2 text-sm font-bold"}>
+                                {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        )}
+                        <button type="submit" className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-5 rounded-xl font-bold hover:shadow-lg shadow-rose-500/20 transition-all active:scale-95"><Plus className="w-5 h-5"/></button>
                     </div>
                 </form>
 
