@@ -1,4 +1,9 @@
-function LeoDashboard({ tasks, db, appId, stats, toggleTask, onLogout, rewardsData }) {
+import React, { useState, useEffect, useRef } from 'react'; // <-- Add
+import { Star, Gift, Gamepad2, Award, Timer, Repeat, ShoppingCart, Lock, X, Volume2, Pause, Play, Check } from 'lucide-react'; // <-- Add
+import { doc, setDoc, updateDoc } from 'firebase/firestore'; // <-- Add
+
+export function LeoDashboard({ tasks, db, appId, stats, toggleTask, onLogout, rewardsData }) {
+
     const [flyingStars, setFlyingStars] = useState([]);
     const [localCompleted, setLocalCompleted] = useState({});
     const [showRewards, setShowRewards] = useState(false);
