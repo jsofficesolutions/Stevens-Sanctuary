@@ -240,11 +240,13 @@ export function FinanceTab({ finances, db, appId, user }) {
                         </div>
                     </div>
                     
-                    <form onSubmit={addPot} className="flex gap-2 mb-8 bg-slate-50 dark:bg-slate-950 p-2 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-                        <input type="text" value={newPotName} onChange={e=>setNewPotName(e.target.value)} placeholder="Pot name..." className="flex-1 bg-transparent outline-none text-sm font-bold px-3 placeholder:text-slate-400" />
-                        <input type="number" value={newPotAlloc} onChange={e=>setNewPotAlloc(e.target.value)} placeholder="£ Alloc" className="w-24 bg-transparent outline-none text-sm font-bold border-l border-slate-200 dark:border-slate-700 pl-3 placeholder:text-slate-400" />
-                        <button type="submit" className="bg-violet-500 text-white px-4 py-2 rounded-xl font-bold shadow-sm active:scale-95 transition-transform"><Plus className="w-5 h-5"/></button>
-                    </form>
+            <form onSubmit={addPot} className="flex gap-2 mb-8">
+                        <input type="text" value={newPotName} onChange={e=>setNewPotName(e.target.value)} placeholder="Pot name (e.g., Groceries)..." className={inputBaseClasses + " flex-1"} />
+                        <input type="number" value={newPotAlloc} onChange={e=>setNewPotAlloc(e.target.value)} placeholder="£ Alloc" className={inputBaseClasses + " w-28"} />
+                        <button type="submit" className="bg-violet-500 hover:bg-violet-600 text-white px-4 rounded-2xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md shadow-violet-500/20 shrink-0">
+                    <Plus className="w-5 h-5"/>
+                </button>
+             </form>
 
                     <div className="space-y-5">
                         {(currentFinance.pots||[]).map(pot => {
