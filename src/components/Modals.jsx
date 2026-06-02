@@ -1,4 +1,12 @@
-function SettingsModal({ onClose, isDarkMode, setIsDarkMode, systemUsers }) {
+import React, { useState } from 'react'; // <-- Add missing React hook import
+import { 
+  X, Moon, Sun, AlertCircle, History, 
+  AtSign, CheckCircle2, Zap, BellRing 
+} from 'lucide-react'; // <-- Add missing Icon imports
+import { inputBaseClasses } from '../helpers'; // <-- Add missing helper classes import
+
+// Add 'export' before 'function SettingsModal'
+export function SettingsModal({ onClose, isDarkMode, setIsDarkMode, systemUsers }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200/50 dark:border-slate-800 animate-in zoom-in-95 duration-200">
@@ -39,7 +47,8 @@ function SettingsModal({ onClose, isDarkMode, setIsDarkMode, systemUsers }) {
     )
 }
 
-function PromptModal({ title, initialValue = '', onSave, onCancel }) {
+// Add 'export' before 'function PromptModal'
+export function PromptModal({ title, initialValue = '', onSave, onCancel }) {
     const [val, setVal] = useState(initialValue);
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -55,7 +64,8 @@ function PromptModal({ title, initialValue = '', onSave, onCancel }) {
     )
 }
 
-function ConfirmModal({ title, message, onConfirm, onCancel }) {
+// Add 'export' before 'function ConfirmModal'
+export function ConfirmModal({ title, message, onConfirm, onCancel }) {
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-sm p-8 border border-slate-200/50 dark:border-slate-800 animate-in zoom-in-95 duration-200">
@@ -73,7 +83,8 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
     )
 }
 
-function ActivityLogModal({ logs, onClose }) {
+// Add 'export' before 'function ActivityLogModal'
+export function ActivityLogModal({ logs, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-slate-200/50 dark:border-slate-800 animate-in zoom-in-95 duration-200">
@@ -98,7 +109,8 @@ function ActivityLogModal({ logs, onClose }) {
     )
 }
 
-function NotificationsPanel({ notifications, onClose, onNotificationClick }) {
+// Add 'export' before 'function NotificationsPanel'
+export function NotificationsPanel({ notifications, onClose, onNotificationClick }) {
     const getIcon = (type) => {
         if (type === 'mention') return <AtSign className="w-4 h-4 text-amber-500" />;
         if (type === 'complete') return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
