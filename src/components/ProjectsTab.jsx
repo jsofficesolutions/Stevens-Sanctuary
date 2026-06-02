@@ -1,4 +1,12 @@
-function ProjectsTab({ tasks, projects, userProfile, onOpenTask, db, appId, user, systemUsers, toggleTask, logActivity, sendNotification }) {
+import React, { useState } from 'react'; // <-- Add
+import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, Edit2, Trash2 } from 'lucide-react'; // <-- Add
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // <-- Add
+import { cardBaseClasses, inputBaseClasses, WEEK_DAYS } from '../helpers'; // <-- Add
+import { TaskRow } from './TaskComponents'; // <-- Add
+import { PromptModal, ConfirmModal } from './Modals'; // <-- Add
+
+export function ProjectsTab({ tasks, projects, userProfile, onOpenTask, db, appId, user, systemUsers, toggleTask, logActivity, sendNotification }) {
+    
     const [newProject, setNewProject] = useState('');
     const [newTask, setNewTask] = useState('');
     const [newAssignee, setNewAssignee] = useState('');
