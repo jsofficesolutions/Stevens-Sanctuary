@@ -1,3 +1,5 @@
+import React, { useState, useEffect } from 'react';
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeProfile, setActiveProfile] = useState(localStorage.getItem('sanctuary_profile') || null);
