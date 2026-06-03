@@ -1,275 +1,220 @@
-import React, { useState } from 'react'; // <-- Add
-import { Plus, ChevronDown, ChevronRight, ArrowUp, ArrowDown, Edit2, Trash2 } from 'lucide-react'; // <-- Add
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // <-- Add
-import { cardBaseClasses, inputBaseClasses, WEEK_DAYS } from '../helpers'; // <-- Add
-import { TaskRow } from './TaskComponents'; // <-- Add
-import { PromptModal, ConfirmModal } from './Modals'; // <-- Add
+import React, { useState } from 'react';
+import { FolderPlus, Folder, Trash2, Plus, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { cardBaseClasses, inputBaseClasses } from '../helpers';
 
-export function ProjectsTab({ tasks, projects, userProfile, onOpenTask, db, appId, user, systemUsers, toggleTask, logActivity, sendNotification }) {
-    
-    const [newProject, setNewProject] = useState('');
-    const [newTask, setNewTask] = useState('');
-    const [newAssignee, setNewAssignee] = useState('');
-    const [newDueDate, setNewDueDate] = useState('');
-    const [newTimeLimit, setNewTimeLimit] = useState('');
-    const [newRecurrence, setNewRecurrence] = useState('none');
-    const [newRecurrenceDays, setNewRecurrenceDays] = useState([]);
-    const [newRecurEndDate, setNewRecurEndDate] = useState('');
-    const [selectedProject, setSelectedProject] = useState('');
-    const [selectedSection, setSelectedSection] = useState('General');
-    const [newSection, setNewSection] = useState('');
-    
-    const [actionModal, setActionModal] = useState(null); 
-    const [expandedProjects, setExpandedProjects] = useState([]);
+export default function ProjectsTab({ projects, tasks, db, appId, userProfile, toggleTask }) {
+    const [newProjectName, setNewProjectName] = useState('');
+    const [selectedProject, setSelectedProject] = useState(null);
+    const [newProjectTask, setNewProjectTask] = useState('');
 
-    const toggleProjectExpand = (projId) => {
-        setExpandedProjects(prev => prev.includes(projId) ? prev.filter(id => id !== projId) : [...prev, projId]);
-    };
-
-    const sortedProjects = [...projects].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const projObj = sortedProjects.find(p => p.id === selectedProject);
-    const availableSections = projObj?.sections || ['General'];
-
-    const handleAddProject = async (e) => {
+    const handleCreateProject = async (e) => {
         e.preventDefault();
-        if(!newProject.trim() || !user) return;
-        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), { 
-            name: newProject, sections: ['General'], order: sortedProjects.length, createdAt: new Date().toISOString() 
+        if (!newProjectName.trim()) return;
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'projects'), {
+            name: newProjectName.trim(),
+            createdAt: new Date().toISOString(),
+            createdBy: userProfile?.name || 'System'
         });
-        setExpandedProjects(prev => [...prev, docRef.id]); 
-        logActivity(`Created project: "${newProject}"`, userProfile);
-        setNewProject('');
+        setNewProjectName('');
     };
 
-    const handleAddSection = async (projId) => {
-        if(!newSection.trim() || !user) return;
-        const p = projects.find(p => p.id === projId);
-        const sections = p.sections || ['General'];
-        if(!sections.includes(newSection)) {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', projId), { sections: [...sections, newSection] });
-            logActivity(`Added section "${newSection}" to project "${p.name}"`, userProfile);
-        }
-        setNewSection('');
-    };
-
-    const handleAddTask = async (e) => {
+    const handleAddProjectTask = async (e) => {
         e.preventDefault();
-        if(!newTask.trim() || !user) return;
-        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
-            title: newTask, assignee: newAssignee, projectId: selectedProject, section: selectedSection || 'General',
-            dueDate: newDueDate || null, timeLimit: newTimeLimit ? Number(newTimeLimit) : null,
-            recurrence: newRecurrence, recurrenceDays: newRecurrenceDays, recurrenceEndDate: newRecurEndDate || null,
-            completed: false, nudged: false, subtasks: [], createdAt: new Date().toISOString(), createdBy: userProfile
+        if (!newProjectTask.trim() || !selectedProject) return;
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'tasks'), {
+            title: newProjectTask.trim(),
+            projectId: selectedProject.id,
+            assignee: 'Unassigned',
+            section: '',
+            dueDate: null,
+            timeLimit: null,
+            recurrence: 'none',
+            recurrenceDays: [],
+            recurrenceEndDate: null,
+            completed: false,
+            nudged: false,
+            subtasks: [],
+            createdAt: new Date().toISOString(),
+            createdBy: userProfile
         });
-        logActivity(`Added task: "${newTask}"`, userProfile);
-        if (newAssignee && newAssignee !== userProfile && newAssignee !== 'Both') {
-            sendNotification(newAssignee, `${userProfile} assigned you a task: "${newTask}"`, docRef.id, 'assign');
-        }
-        if (selectedProject && !expandedProjects.includes(selectedProject)) {
-            setExpandedProjects(prev => [...prev, selectedProject]);
-        }
-        setNewTask(''); setNewDueDate(''); setNewTimeLimit(''); setNewRecurrence('none'); setNewRecurrenceDays([]); setNewRecurEndDate('');
+        setNewProjectTask('');
     };
 
-    const executeAction = async (val) => {
-        const { type, targetId, sectionName, targetProjId } = actionModal;
-        if (type === 'editProject') {
-            if (val && val.trim()) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', targetId), { name: val.trim() });
-        } else if (type === 'deleteProject') {
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', targetId));
-            const pTasks = tasks.filter(t => t.projectId === targetId);
-            for(const t of pTasks) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id), { projectId: '', section: 'General' });
-        } else if (type === 'editSection') {
-            if (val && val.trim() && val.trim() !== sectionName) {
-                const p = projects.find(p => p.id === targetProjId);
-                const updatedSections = p.sections.map(s => s === sectionName ? val.trim() : s);
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', targetProjId), { sections: updatedSections });
-                const sTasks = tasks.filter(t => t.projectId === targetProjId && (t.section || 'General') === sectionName);
-                for(const t of sTasks) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id), { section: val.trim() });
+    const handleDeleteProject = async (projectId, e) => {
+        e.stopPropagation();
+        if (confirm('Are you sure you want to delete this project folder? Linked tasks will remain unassigned.')) {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', projectId));
+            if (selectedProject?.id === projectId) {
+                setSelectedProject(null);
             }
-        } else if (type === 'deleteSection') {
-            const p = projects.find(p => p.id === targetProjId);
-            const updatedSections = p.sections.filter(s => s !== sectionName);
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', targetProjId), { sections: updatedSections });
-            const sTasks = tasks.filter(t => t.projectId === targetProjId && (t.section || 'General') === sectionName);
-            for(const t of sTasks) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', t.id), { section: 'General' });
-        }
-        setActionModal(null);
-    };
-
-    const moveProject = async (p, direction) => {
-        const index = sortedProjects.findIndex(proj => proj.id === p.id);
-        if (direction === 'up' && index > 0) {
-            const prev = sortedProjects[index - 1];
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id), { order: index - 1 });
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', prev.id), { order: index });
-        } else if (direction === 'down' && index < sortedProjects.length - 1) {
-            const next = sortedProjects[index + 1];
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', p.id), { order: index + 1 });
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'projects', next.id), { order: index });
         }
     };
 
-return (
-        <div className="space-y-10 animate-in fade-in duration-500">
+    return (
+        <div className="space-y-10 animate-in fade-in duration-500 w-full max-w-full overflow-hidden">
             <header>
-                <h2 className="text-4xl font-black mb-2 tracking-tight">Projects & Folders</h2>
-                <p className="text-slate-500 text-lg font-medium">Manage household projects, chores, and sub-sections.</p>
+                <h2 className="text-4xl font-black mb-2 tracking-tight">Projects</h2>
+                <p className="text-slate-500 text-lg font-medium">Group workflows and assign tasks into top-level folders.</p>
             </header>
 
-            {/* Added container layout and the missing opening form wrapper */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <form onSubmit={handleAddTask} className={cardBaseClasses + " lg:col-span-2 space-y-6"}>
-                    <h3 className="font-black text-xs text-slate-400 uppercase tracking-[0.15em] mb-2">Quick Add Task</h3>
-                    <input type="text" value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="What needs doing?" className={inputBaseClasses + " w-full"} />
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Assignee</label>
-                            <select value={newAssignee} onChange={e=>setNewAssignee(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"}>
-                                <option value="">Unassigned</option>
-                                {systemUsers.map(u => <option key={u.id} value={u.name}>For {u.name}</option>)}
-                                <option value="Both">Joint</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Due Date</label>
-                            <input type="date" value={newDueDate} onChange={e=>setNewDueDate(e.target.value)} className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Time Limit</label>
-                            <input type="number" value={newTimeLimit} onChange={e=>setNewTimeLimit(e.target.value)} placeholder="Mins (opt)" className={inputBaseClasses + " w-full py-2.5 text-sm font-bold"} />
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 items-center">
-                        <select value={newRecurrence} onChange={e=>{setNewRecurrence(e.target.value); setNewRecurrenceDays([]);}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
-                            <option value="none">Does not repeat</option>
-                            <option value="daily">Repeats Daily</option>
-                            <option value="weekly">Repeats Weekly</option>
-                            <option value="biweekly">Repeats Biweekly</option>
-                            <option value="monthly">Repeats Monthly</option>
-                        </select>
-                        {(newRecurrence === 'weekly' || newRecurrence === 'biweekly') && (
-                            <div className="flex gap-1 ml-2">
-                                {WEEK_DAYS.map((d, i) => (
-                                    <button key={i} type="button" onClick={(e) => { e.preventDefault(); if(newRecurrenceDays.includes(d.v)) setNewRecurrenceDays(newRecurrenceDays.filter(day => day !== d.v)); else setNewRecurrenceDays([...newRecurrenceDays, d.v]); }}
-                                        className={`w-8 h-8 rounded-full text-[10px] font-bold shadow-sm transition-all ${newRecurrenceDays.includes(d.v) ? 'bg-indigo-500 text-white scale-110' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
-                                        {d.l}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    {newRecurrence !== 'none' && (
-                        <div className={inputBaseClasses + " flex items-center gap-3 py-2"}>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">Recur Until (Optional)</span>
-                            <input type="date" value={newRecurEndDate} onChange={e=>setNewRecurEndDate(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-slate-700 dark:text-slate-200" />
-                        </div>
-                    )}
-
-                    <div className="flex gap-3">
-                        <select value={selectedProject} onChange={e=>{setSelectedProject(e.target.value); setSelectedSection('General');}} className={inputBaseClasses + " flex-1 py-2 text-sm font-bold"}>
-                            <option value="">General (No Project)</option>
-                            {sortedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        {selectedProject && (
-                            <select value={selectedSection} onChange={e=>setSelectedSection(e.target.value)} className={inputBaseClasses + " w-1/3 py-2 text-sm font-bold"}>
-                                {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        )}
-                        <button type="submit" className="bg-gradient-to-r from-rose-500 to-rose-600 text-white px-5 rounded-xl font-bold hover:shadow-lg shadow-rose-500/20 transition-all active:scale-95"><Plus className="w-5 h-5"/></button>
-                    </div>
-                </form>
-
-                <form onSubmit={handleAddProject} className={cardBaseClasses + " flex flex-col justify-between"}>
-                    <div>
-                        <h3 className="font-black text-xs text-slate-400 uppercase tracking-[0.15em] mb-5">New Project Folder</h3>
-                        <p className="text-sm text-slate-500 mb-6">Create top-level folders to organize related tasks and chores.</p>
-                    </div>
-                    <div className="flex gap-3">
-                        <input type="text" value={newProject} onChange={e=>setNewProject(e.target.value)} placeholder="e.g. House Renovation" className={inputBaseClasses + " flex-1"} required />
-                        <button type="submit" className="bg-slate-800 dark:bg-slate-700 text-white px-6 rounded-xl font-bold transition-transform active:scale-95 shadow-md hover:bg-slate-900"><Plus className="w-5 h-5"/></button>
-                    </div>
-                </form>
-            </div>
-
-            <div className="space-y-4">
-                {sortedProjects.map((p, index) => {
-                    const pTasks = tasks.filter(t => t.projectId === p.id);
-                    const activeCount = pTasks.filter(t=>!t.completed).length;
-                    const sections = p.sections || ['General'];
-                    const isExpanded = expandedProjects.includes(p.id);
-                    
-                    return (
-                        <div key={p.id} className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden transition-all duration-300">
-                            <div 
-                                className="flex justify-between items-center p-6 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors select-none"
-                                onClick={() => toggleProjectExpand(p.id)}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full max-w-full">
+                {/* LEFT: PROJECT FOLDERS LIST & CREATION */}
+                <div className="space-y-6 lg:col-span-1 w-full max-w-full">
+                    {/* Fixed Creation Card Layout (image_1e850a.png Fix) */}
+                    <div className={cardBaseClasses + " w-full max-w-full overflow-hidden"}>
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.15em] mb-2">New Project Folder</h3>
+                        <p className="text-slate-500 text-sm font-medium mb-6">Create top-level folders to organize related tasks and chores.</p>
+                        
+                        <form onSubmit={handleCreateProject} className="flex gap-2.5 items-center w-full max-w-full">
+                            <input 
+                                type="text" 
+                                value={newProjectName} 
+                                onChange={e => setNewProjectName(e.target.value)} 
+                                placeholder="e.g. House Renovation" 
+                                className={inputBaseClasses + " flex-1 min-w-0"} 
+                                required
+                            />
+                            <button 
+                                type="submit" 
+                                className="bg-slate-800 hover:bg-slate-700 text-white px-4 h-12 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 shrink-0"
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-transparent'}`}>
-                                        {isExpanded ? <ChevronDown className="w-5 h-5 text-slate-500"/> : <ChevronRight className="w-5 h-5 text-slate-400"/>}
-                                    </div>
-                                    <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 tracking-tight">{p.name}</h3>
-                                    {!isExpanded && activeCount > 0 && (
-                                        <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg border border-slate-200/50 dark:border-slate-700">{activeCount} active</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-1 bg-slate-100/50 dark:bg-slate-950/50 border border-slate-200/50 dark:border-slate-800/50 rounded-xl p-1 shadow-inner" onClick={e => e.stopPropagation()}>
-                                    <button onClick={()=>moveProject(p, 'up')} disabled={index === 0} className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white disabled:opacity-30 transition-colors"><ArrowUp className="w-4 h-4"/></button>
-                                    <button onClick={()=>moveProject(p, 'down')} disabled={index === sortedProjects.length - 1} className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white disabled:opacity-30 transition-colors"><ArrowDown className="w-4 h-4"/></button>
-                                    <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                    <button onClick={()=>setActionModal({type: 'editProject', targetId: p.id})} className="p-2 text-slate-400 hover:text-indigo-500 transition-colors"><Edit2 className="w-4 h-4"/></button>
-                                    <button onClick={()=>setActionModal({type: 'deleteProject', targetId: p.id})} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4"/></button>
-                                </div>
-                            </div>
-                            
-                            {isExpanded && (
-                                <div className="p-6 md:p-8 pt-0 border-t border-slate-100 dark:border-slate-800 mt-2 space-y-8 animate-in slide-in-from-top-4 duration-300">
-                                    {sections.map(sectionName => {
-                                        const sTasks = pTasks.filter(t => (t.section || 'General') === sectionName);
-                                        if (sTasks.length === 0 && sectionName === 'General') return null;
+                                <Plus className="w-5 h-5"/>
+                            </button>
+                        </form>
+                    </div>
 
-                                        return (
-                                            <div key={sectionName} className="bg-slate-50/50 dark:bg-slate-950/50 border border-slate-200/50 dark:border-slate-800/50 rounded-3xl p-5 shadow-sm">
-                                                <div className="flex justify-between items-center mb-4 px-2">
-                                                    <h4 className="font-black text-sm text-slate-400 uppercase tracking-[0.15em]">{sectionName}</h4>
-                                                    {sectionName !== 'General' && (
-                                                        <div className="flex gap-2">
-                                                            <button onClick={()=>setActionModal({type: 'editSection', targetProjId: p.id, sectionName})} className="text-slate-300 hover:text-indigo-500 transition-colors"><Edit2 className="w-4 h-4"/></button>
-                                                            <button onClick={()=>setActionModal({type: 'deleteSection', targetProjId: p.id, sectionName})} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4"/></button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="space-y-2.5">
-                                                    {sTasks.filter(t=>!t.completed).length === 0 && <p className="text-sm text-slate-400 font-medium italic px-2 pb-2">No active tasks here.</p>}
-                                                    {sTasks.filter(t=>!t.completed).map(t => <TaskRow key={t.id} task={t} onToggle={()=>toggleTask(t, userProfile)} onOpen={()=>onOpenTask(t)} />)}
-                                                    {sTasks.filter(t=>t.completed).length > 0 && (
-                                                        <div className="pt-3 mt-3 border-t border-slate-200/60 dark:border-slate-800/60 opacity-60 mix-blend-luminosity hover:mix-blend-normal transition-all duration-300">
-                                                            {sTasks.filter(t=>t.completed).map(t => <TaskRow key={t.id} task={t} onToggle={()=>toggleTask(t, userProfile)} onOpen={()=>onOpenTask(t)} />)}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-
-                                    <div className="mt-6 flex gap-3">
-                                        <input type="text" value={selectedProject===p.id ? newSection : ''} onChange={e=>{setNewSection(e.target.value); setSelectedProject(p.id);}} placeholder="Add a new section (e.g. Painting)..." className={inputBaseClasses + " flex-1 py-2 text-sm"} />
-                                        <button onClick={()=>handleAddSection(p.id)} className="bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-5 rounded-xl font-bold text-sm hover:bg-slate-300 transition-colors">Add Section</button>
+                    {/* PROJECT FOLDERS MANAGEMENT */}
+                    <div className={cardBaseClasses + " w-full max-w-full"}>
+                        <h3 className="font-black text-xl mb-4 tracking-tight flex items-center gap-2">
+                            <Folder className="w-5 h-5 text-slate-400" /> Folders
+                        </h3>
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                            {projects.map(project => {
+                                const isSelected = selectedProject?.id === project.id;
+                                const projectTaskCount = tasks.filter(t => t.projectId === project.id).length;
+                                
+                                return (
+                                    <div 
+                                        key={project.id}
+                                        onClick={() => setSelectedProject(project)}
+                                        className={`flex justify-between items-center p-4 rounded-2xl border cursor-pointer transition-all group ${
+                                            isSelected 
+                                                ? 'bg-slate-900 border-slate-900 text-white shadow-md' 
+                                                : 'bg-slate-50/50 dark:bg-slate-950/50 border-slate-100 dark:border-slate-800/50 hover:bg-slate-100/70'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col overflow-hidden pr-2">
+                                            <span className="font-bold truncate text-sm sm:text-base">{project.name}</span>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest mt-0.5 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
+                                                {projectTaskCount} {projectTaskCount === 1 ? 'task' : 'tasks'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <ArrowRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-white translate-x-1' : 'text-slate-400 group-hover:translate-x-0.5'}`} />
+                                            <button 
+                                                type="button" 
+                                                onClick={(e) => handleDeleteProject(project.id, e)} 
+                                                className={`p-1 rounded-lg transition-opacity ${isSelected ? 'text-slate-400 hover:text-red-400' : 'text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100'}`}
+                                            >
+                                                <Trash2 className="w-4 h-4"/>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                );
+                            })}
+                            {projects.length === 0 && (
+                                <p className="text-sm font-medium italic text-slate-400 text-center py-6">No project folders defined yet.</p>
                             )}
                         </div>
-                    )
-                })}
-            </div>
+                    </div>
+                </div>
 
-            {actionModal?.type === 'editProject' && <PromptModal title="Rename Project" initialValue={projects.find(p=>p.id===actionModal.targetId)?.name} onSave={executeAction} onCancel={()=>setActionModal(null)} />}
-            {actionModal?.type === 'deleteProject' && <ConfirmModal title="Delete Project?" message="Are you sure you want to delete this project? Its tasks will be moved to General." onConfirm={executeAction} onCancel={()=>setActionModal(null)} />}
-            {actionModal?.type === 'editSection' && <PromptModal title="Rename Section" initialValue={actionModal.sectionName} onSave={executeAction} onCancel={()=>setActionModal(null)} />}
-            {actionModal?.type === 'deleteSection' && <ConfirmModal title="Delete Section?" message={`Delete the section "${actionModal.sectionName}"? Tasks will be moved to General.`} onConfirm={executeAction} onCancel={()=>setActionModal(null)} />}
+                {/* RIGHT: SELECTED PROJECT INNER CONTENT VIEW */}
+                <div className="lg:col-span-2 w-full max-w-full">
+                    {selectedProject ? (
+                        <div className={cardBaseClasses + " w-full max-w-full flex flex-col min-h-[510px]"}>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-5 mb-6 gap-4 w-full">
+                                <div className="overflow-hidden">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-1">Active Folder View</span>
+                                    <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 tracking-tight truncate">{selectedProject.name}</h3>
+                                </div>
+                            </div>
+
+                            {/* ADD TASK INSIDE FOLDER CONTAINER */}
+                            <form onSubmit={handleAddProjectTask} className="flex gap-2 mb-6 w-full max-w-full items-center">
+                                <input 
+                                    type="text" 
+                                    value={newProjectTask} 
+                                    onChange={e => setNewProjectTask(e.target.value)} 
+                                    placeholder={`Add task directly into ${selectedProject.name}...`} 
+                                    className={inputBaseClasses + " flex-1 min-w-0"} 
+                                    required 
+                                />
+                                <button 
+                                    type="submit" 
+                                    className="bg-slate-900 hover:bg-slate-800 text-white px-5 h-12 rounded-xl font-bold flex items-center justify-center transition-all active:scale-95 shadow-md shrink-0"
+                                >
+                                    <Plus className="w-5 h-5"/>
+                                </button>
+                            </form>
+
+                            {/* PROJECT FOLDER TASKS FEED */}
+                            <div className="space-y-2 flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-2">Pending Tasks</h4>
+                                {tasks.filter(t => t.projectId === selectedProject.id && !t.completed).map(task => (
+                                    <div key={task.id} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 group hover:border-slate-200 transition-colors w-full max-w-full">
+                                        <button onClick={() => toggleTask(task, userProfile)} className="transform transition-transform active:scale-75 shrink-0">
+                                            <Circle className="w-5 h-5 text-slate-300 hover:text-slate-600" />
+                                        </button>
+                                        <div className="flex-1 overflow-hidden pr-2">
+                                            <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">{task.title}</span>
+                                            {task.assignee && task.assignee !== 'Unassigned' && (
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5 inline-block bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">
+                                                    {task.assignee}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id))} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 shrink-0">
+                                            <Trash2 className="w-4 h-4"/>
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {tasks.filter(t => t.projectId === selectedProject.id && !t.completed).length === 0 && (
+                                    <p className="text-sm font-semibold text-slate-400 italic py-6 text-center bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-100 dark:border-slate-800">No pending folder items listed.</p>
+                                )}
+
+                                {/* ARCHIVED / COMPLETED SEGMENT INSIDE FOLDER */}
+                                {tasks.filter(t => t.projectId === selectedProject.id && t.completed).length > 0 && (
+                                    <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 space-y-2 w-full max-w-full">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-2">Completed</h4>
+                                        {tasks.filter(t => t.projectId === selectedProject.id && t.completed).map(task => (
+                                            <div key={task.id} className="flex items-center gap-4 p-4 rounded-2xl opacity-50 grayscale group w-full max-w-full">
+                                                <button onClick={() => toggleTask(task, userProfile)} className="shrink-0">
+                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                </button>
+                                                <span className="flex-1 font-bold line-through text-slate-500 truncate">{task.title}</span>
+                                                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'tasks', task.id))} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 p-1 shrink-0">
+                                                    <Trash2 className="w-4 h-4"/>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center min-h-[510px] bg-slate-50/20 w-full max-w-full">
+                            <FolderPlus className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
+                            <h4 className="font-black text-lg text-slate-700 dark:text-slate-300 tracking-tight">No Folder Selected</h4>
+                            <p className="text-sm text-slate-400 font-medium max-w-xs mt-1">Select a folder profile from the list to view embedded milestones, chores, and complete project breakdowns.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
