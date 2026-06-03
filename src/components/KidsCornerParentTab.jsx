@@ -1,7 +1,7 @@
-import React, { useState } from 'react'; // <-- Add
-import { Star, Timer, Repeat, Plus, Circle, Trash2, CheckCircle2, Gift, ShoppingCart } from 'lucide-react'; // <-- Add
-import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'; // <-- Add
-import { cardBaseClasses, inputBaseClasses } from '../helpers'; // <-- Add
+import React, { useState } from 'react';
+import { Star, Timer, Repeat, Plus, Circle, Trash2, CheckCircle2, Gift, ShoppingCart } from 'lucide-react';
+import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { cardBaseClasses, inputBaseClasses } from '../helpers';
 
 export function KidsTab({ leoData, db, appId, user, logActivity, leoStats, tasks, toggleTask, userProfile }) {
 
@@ -35,6 +35,7 @@ export function KidsTab({ leoData, db, appId, user, logActivity, leoStats, tasks
                 cost: newRewardCost === '' ? 0 : Number(newRewardCost), 
                 status: 'available', 
                 isPermanent: isPermanentReward,
+                childName: 'Leo', // Added explicitly so notifications display the child's name
                 createdAt: new Date().toISOString() 
             });
             setNewRewardCost('');
@@ -127,15 +128,19 @@ export function KidsTab({ leoData, db, appId, user, logActivity, leoStats, tasks
                     ) : activeList === 'rewards' ? (
                         <>
                             {leoData.rewards?.filter(r => r.status === 'pending').map(reward => (
-                                <div key={reward.id} className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-gradient-to-r from-rose-50 to-white dark:from-rose-900/20 dark:to-slate-900 shadow-sm animate-in slide-in-from-left-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900/50 rounded-full flex items-center justify-center">
+                                <div key={reward.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border border-rose-200 dark:border-rose-800/60 bg-gradient-to-br from-rose-50 to-white dark:from-rose-900/10 dark:to-slate-900 shadow-sm animate-in slide-in-from-left-4">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-11 h-11 bg-rose-100 dark:bg-rose-900/40 rounded-full flex items-center justify-center shrink-0 shadow-sm">
                                             <Gift className="w-5 h-5 text-rose-500" />
                                         </div>
-                                        <span className="font-bold text-rose-800 dark:text-rose-200 text-lg">{reward.title}</span>
-                                        <span className="text-[10px] uppercase font-black tracking-widest text-rose-500 bg-rose-100 dark:bg-rose-900/50 px-2.5 py-1 rounded-md shadow-sm ml-2">Pending Auth</span>
+                                        <div>
+                                            <p className="font-bold text-slate-800 dark:text-slate-200 text-lg leading-snug">
+                                                <span className="text-rose-600 dark:text-rose-400 font-extrabold">{reward.childName || 'Leo'}</span> wants to cash in <span className="text-amber-600 dark:text-amber-400 font-extrabold">{reward.cost} stars</span> for "{reward.title}"
+                                            </p>
+                                            <span className="text-[10px] uppercase font-black tracking-widest text-rose-500 bg-rose-100/50 dark:bg-rose-900/40 px-2.5 py-0.5 rounded-md shadow-inner mt-1.5 inline-block">Pending Approval</span>
+                                        </div>
                                     </div>
-                                    <button onClick={() => approveReward(reward.id)} className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all">Approve</button>
+                                    <button onClick={() => approveReward(reward.id)} className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all shrink-0">Approve Request</button>
                                 </div>
                             ))}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
