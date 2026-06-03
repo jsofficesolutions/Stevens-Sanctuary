@@ -3,7 +3,8 @@ import { FolderPlus, Folder, Trash2, Plus, ArrowRight, CheckCircle2, Circle } fr
 import { collection, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { cardBaseClasses, inputBaseClasses } from '../helpers';
 
-export default function ProjectsTab({ projects, tasks, db, appId, userProfile, toggleTask }) {
+// FIXED: Exported as a named function export to match the import structure in src/App.jsx
+export function ProjectsTab({ projects, tasks, db, appId, userProfile, toggleTask }) {
     const [newProjectName, setNewProjectName] = useState('');
     const [selectedProject, setSelectedProject] = useState(null);
     const [newProjectTask, setNewProjectTask] = useState('');
@@ -63,7 +64,7 @@ export default function ProjectsTab({ projects, tasks, db, appId, userProfile, t
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start w-full max-w-full">
                 {/* LEFT: PROJECT FOLDERS LIST & CREATION */}
                 <div className="space-y-6 lg:col-span-1 w-full max-w-full">
-                    {/* Fixed Creation Card Layout (image_1e850a.png Fix) */}
+                    {/* Fixed Creation Card Layout */}
                     <div className={cardBaseClasses + " w-full max-w-full overflow-hidden"}>
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.15em] mb-2">New Project Folder</h3>
                         <p className="text-slate-500 text-sm font-medium mb-6">Create top-level folders to organize related tasks and chores.</p>
@@ -172,7 +173,7 @@ export default function ProjectsTab({ projects, tasks, db, appId, userProfile, t
                                         <div className="flex-1 overflow-hidden pr-2">
                                             <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">{task.title}</span>
                                             {task.assignee && task.assignee !== 'Unassigned' && (
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5 inline-block bg-slate-100 dark:bg-slate-900 px-2 py-0.5 rounded">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-0.5 inline-block bg-slate-100 dark:bg-slate-900 shadow-sm px-2 py-0.5 rounded">
                                                     {task.assignee}
                                                 </span>
                                             )}
